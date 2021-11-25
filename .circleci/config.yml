@@ -7,7 +7,7 @@ jobs:
   build:
     macos:
         xcode: 12
-    resource_class: small
+    resource_class: medium
     working_directory: ~/repo
     steps:
       - checkout
