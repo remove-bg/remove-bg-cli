@@ -1,0 +1,24 @@
+version: 2.1
+
+orbs:
+  node: circleci/node@4.7
+
+jobs:
+  build:
+    macos:
+        xcode: 12
+    resource_class: small
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: Configure npm
+          command: |
+            npm config set registry https://npm-proxy.fury.io/kaleido/
+      - node/install-packages:
+          pkg-manager: npm
+          cache-version: ${CACHE_VERSION}
+      - run: npm run build
+      #- test: npm run test
+      - store_artifacts:
+          path: dist
