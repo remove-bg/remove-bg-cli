@@ -9,7 +9,7 @@
 	},
 	"bin": "cli.js",
 	"scripts": {
-		"test": "ava test/test.js",
+		"test": "jest test/test.js",
 		"build": "npx pkg package.json --out-path dist"
 	},
 	"dependencies": {
@@ -27,8 +27,7 @@
 		"superagent": "^6.1.0"
 	},
 	"devDependencies": {
-		"ava": "^3.15.0",
 		"execa": "^5.0.0",
-		"xo": "^0.37.0"
+		"jest": "^27.4.2"
 	}
 }
