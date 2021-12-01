@@ -7,6 +7,7 @@ const { expandPaths } = require('./lib/storage');
 const { prompts } = require('prompts')
 const cliProgress = require('cli-progress');
 const fs = require('fs');
+const { version } = require('./lib/client');
 
 /* first - parse the main command */
 
@@ -23,8 +24,13 @@ const multibar = new cliProgress.MultiBar({
 	stopOnComplete: true
 });
 
-if (Object.entries( mainOptions).length === 0 || mainOptions._unknown && mainOptions._unknown[0] === '--help') {
+if (Object.entries( mainOptions).length === 0 || mainOptions._unknown && (mainOptions._unknown[0] === '--help' || mainOptions._unknown[0] === '-h')) {
 	showHelp();
+	return;
+}
+
+if (Object.entries( mainOptions).length === 0 || mainOptions._unknown && (mainOptions._unknown[0] === '--version' || mainOptions._unknown[0] === '-v')) {
+	console.log(version());
 	return;
 }
 
@@ -62,7 +68,7 @@ if (mainOptions.command) {
 				}
 
 				// expand input path(s)
-				var expandedInputPaths = expandPaths(mainOptions.command);
+				var expandedInputPaths = expandPaths(mainOptions.command); // input file is in the mainOptions.command
 
 				var confirmBatchOver = 50;
 				if (removebgOptions['confirm-batch-over']) {
