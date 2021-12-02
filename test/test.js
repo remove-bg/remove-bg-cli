@@ -16,7 +16,7 @@ function optionsFromArgv(args) {
 	return removebgOptions;
 }
 
-jest.setTimeout(100000);
+jest.setTimeout(10000);
 describe('removebg integration tests', () => {
 	test('run removebg --help', done => {
 		exec('node ./cli.js zip2png --help', (err, out) => {
@@ -43,17 +43,18 @@ describe('removebg zip2png integration tests', () => {
 		});
 	});
 
-	test('run removebg zip2png with cli (test/files/test.zip)', () => {
-		console.log("d")
-
-		/*const proc = execa.sync('./cli.js', ['zip2png', '--file=test/files/test.zip'], {
-			buffer: false
-		});
-		var outputPath = 'test/files/test.png';
-		t.true(fs.existsSync(outputPath));
-		fs.unlinkSync(outputPath);
-		t.true(stdout.includes("no such file or directory, open 'test.zip'"));*/
-		expect(true).toBe(true); // not working yet
+	test('run removebg zip2png with cli (test/files/test.zip)', done => {
+		/*exec('node ./cli.js zip2png --file=test/files/test.zip')
+		setTimeout(() => {
+			try {
+				var outputPath = 'test/files/test.png';
+				expect(fs.existsSync(outputPath)).toBe(true);
+				fs.unlinkSync(outputPath);
+			} catch (e) {
+				console.log(e);
+			}
+			done();
+		}, 5000);*/
 	});
 	
 	test('run removebg zip2png -help', done => {
