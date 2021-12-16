@@ -45,9 +45,9 @@ if (mainOptions.commandOrFiles && mainOptions.commandOrFiles[0] === 'zip2png') {
 	let bar = multibar.create(100, 0, {file: `${zip2pngOptions.file} -> ${resultPath}`, message: 'Processing:'});
 
 	zip2png(binary, { resultPath: resultPath, progressCallback: (percent) => {
-		bar.update(percent);
+		if (bar) bar.update(percent);
 	} }).then(() => {
-		bar.update(100, {message: 'Processed:'});
+		if (bar) bar.update(100, {message: 'Processed:'});
 	});
 	return;
 } else {
