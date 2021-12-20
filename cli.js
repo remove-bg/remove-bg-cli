@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 const commandLineArgs = require('command-line-args')
-const commandLineUsage = require('command-line-usage')
 const { removebg, zip2png } = require('./lib/functions.js');
 const { validateRemovebgOptions, mainDefinitions, optionDefinitions, injectEnvVars, showHelp } = require('./lib/options')
 const { expandPaths } = require('./lib/storage');
