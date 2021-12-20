@@ -21,8 +21,12 @@ jobs:
           cache-version: ${CACHE_VERSION}
       - run: npm test
       - run: npm run build
-      - store_artifacts:
+      - store_artifacts:      
           path: dist
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist/*          
   test:
     executor:
       name: win/default
