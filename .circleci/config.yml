@@ -31,7 +31,10 @@ jobs:
           at: .    
       - run: ls
       - run: pwd
-      - run: test/test.sh
+      - run:
+         command: test/test.sh
+         shell: bash.exe   
+
 
 workflows:
   version: 2
