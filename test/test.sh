@@ -1,11 +1,10 @@
-cd ..
-
 if [ -f .env ]
 then
   export $(cat .env | sed 's/#.*//g' | xargs)
 fi
 
 FILE=./test/files/test-removebg.png
+rm -rf $FILE
 node ./cli.js test/files/test.jpg --api-key=$REMOVEBG_API_KEY 
 
 if test -f "$FILE"; then
