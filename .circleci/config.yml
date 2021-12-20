@@ -19,6 +19,7 @@ jobs:
       - node/install-packages:
           pkg-manager: npm
           cache-version: ${CACHE_VERSION}
+      - run: npm run test
       - run: npm run build
       - store_artifacts:
           path: dist
@@ -30,7 +31,6 @@ jobs:
           at: .    
       - run: ls
       - run: pwd
-      - run: npm run test
       - run: test/test.sh
 
 workflows:
