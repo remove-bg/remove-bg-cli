@@ -6,9 +6,8 @@ orbs:
 
 jobs:
   build:
-    macos:
-        xcode: "12"
-    resource_class: medium
+    executor:
+      name: node/default
     working_directory: ~/repo
     steps:
       - checkout
