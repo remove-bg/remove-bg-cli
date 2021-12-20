@@ -2,6 +2,7 @@ version: 2.1
 
 orbs:
   node: circleci/node@4.7
+  win: circleci/windows@2.2.0 
 
 jobs:
   build:
@@ -19,7 +20,17 @@ jobs:
           pkg-manager: npm
           cache-version: ${CACHE_VERSION}
       - run: npm run build
-      - test: npm run test
-      - test: test/test.sh
       - store_artifacts:
           path: dist
+  test:
+    executor:
+      name: win/default # executor type
+    steps:
+      - run: npm run test
+      - run: test/test.sh
+
+workflows:
+  build_and_test:
+    jobs:
+      - build
+      - test
