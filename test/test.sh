@@ -5,7 +5,7 @@ fi
 
 FILE=./test/files/test-removebg.png
 rm -rf $FILE
-node ./cli.js test/files/test.jpg --api-key=$REMOVEBG_API_KEY 
+dist/remove-bg-cli-win.exe test/files/test.jpg --api-key=$REMOVEBG_API_KEY 
 
 if test -f "$FILE"; then
     echo "Success"
