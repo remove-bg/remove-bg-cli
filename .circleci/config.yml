@@ -26,7 +26,8 @@ jobs:
       - persist_to_workspace:
           root: .
           paths:
-            - dist/*          
+            - dist/*
+            - test/*      
   test:
     executor:
       name: win/default
