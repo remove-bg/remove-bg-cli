@@ -23,8 +23,8 @@ jobs:
       - store_artifacts:
           path: dist
   test:
-    docker:
-      - image: cimg/node:current
+    executor:
+      name: win/default
     steps:
       - attach_workspace:
           at: .    
