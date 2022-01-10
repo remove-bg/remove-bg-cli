@@ -9,7 +9,6 @@ jobs:
     executor:
       name: win/default
       shell: powershell.exe
-      resource_class: medium
     working_directory: ~/repo
     steps:
       - checkout
