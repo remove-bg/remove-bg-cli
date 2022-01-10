@@ -6,13 +6,15 @@ orbs:
 
 jobs:
   build:
-    working_directory: ~/repo
     executor: win/default
     steps:
       - checkout
-      - node/install-packages:
-          pkg-manager: npm
-          cache-version: ${CACHE_VERSION}
+      - run: nvm install 8.10.0
+      - run: nvm use 8.10.0
+      - run: node -v
+      - run: npm install --global --production windows-build-tools --vs2015
+      - run: npm install node-gyp
+      - run: npm install node-gyp -g
       - run: npm test
       - run: npm run build
       - store_artifacts:      
