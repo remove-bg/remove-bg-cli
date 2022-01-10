@@ -6,16 +6,13 @@ orbs:
 
 jobs:
   build:
-    macos:
-        xcode: 12
+    executor:
+      name: win/default
+      shell: powershell.exe
     resource_class: medium
     working_directory: ~/repo
     steps:
       - checkout
-      - run:
-          name: Configure npm
-          command: |
-            npm config set registry https://npm-proxy.fury.io/kaleido/
       - node/install-packages:
           pkg-manager: npm
           cache-version: ${CACHE_VERSION}
