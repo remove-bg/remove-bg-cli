@@ -10,7 +10,8 @@
 	"bin": "cli.js",
 	"scripts": {
 		"test": "jest test/test.js",
-		"build": "npx pkg package.json --out-path dist"
+		"build": "npx pkg package.json --out-path dist",
+		"build-debug": "npx pkg package.json --out-path dist --debug"
 	},
 	"dependencies": {
 		"ag-psd": "^14.3.2",
@@ -29,5 +30,10 @@
 	"devDependencies": {
 		"execa": "^5.0.0",
 		"jest": "^27.4.2"
+	},
+	"pkg": {
+		"assets": [
+			".\\node_modules\\canvas\\build\\Release\\**"
+		]
 	}
 }
