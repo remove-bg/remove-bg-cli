@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 const commandLineArgs = require('command-line-args')
-const commandLineUsage = require('command-line-usage')
 const { removebg, zip2png } = require('./lib/functions.js');
 const { validateRemovebgOptions, mainDefinitions, optionDefinitions, injectEnvVars, showHelp } = require('./lib/options')
 const { expandPaths } = require('./lib/storage');
@@ -34,63 +33,62 @@ if (Object.entries( mainOptions).length === 0 || mainOptions._unknown && (main
 	return;
 }
 
-if (mainOptions.command) {
-	if (mainOptions.command[0] === 'zip2png') {
-		const zip2pngDefinitions = [
-			{ name: 'file', defaultOption: true }
-		]
-		const zip2pngOptions = commandLineArgs(zip2pngDefinitions, { argv })
+if (mainOptions.commandOrFiles && mainOptions.commandOrFiles[0] === 'zip2png') {
+	const zip2pngDefinitions = [
+		{ name: 'file', defaultOption: true }
+	]
+	const zip2pngOptions = commandLineArgs(zip2pngDefinitions, { argv })
 
-		var binary = fs.readFileSync(zip2pngOptions.file);
-		var resultPath = zip2pngOptions.file.replace('zip', 'png');
-		let bar = multibar.create(100, 0, {file: `${zip2pngOptions.file} -> ${resultPath}`, message: 'Processing:'});
+	var binary = fs.readFileSync(zip2pngOptions.file);
+	var resultPath = zip2pngOptions.file.replace('zip', 'png');
+	let bar = multibar.create(100, 0, {file: `${zip2pngOptions.file} -> ${resultPath}`, message: 'Processing:'});
 
-     	zip2png(binary, { resultPath: resultPath, progressCallback: (percent) => {
-			bar.update(percent);
-		} }).then(() => {
-			bar.update(100, {message: 'Processed:'});
-		});
-		return;
-	} else {
-		(async () => {
-			try {
-				const removebgOptions = commandLineArgs(optionDefinitions, { argv })
-				injectEnvVars(removebgOptions);
-				if (!validateRemovebgOptions(removebgOptions)) return;
+	zip2png(binary, { resultPath: resultPath, progressCallback: (percent) => {
+		if (bar) bar.update(percent);
+	} }).then(() => {
+		if (bar) bar.update(100, {message: 'Processed:'});
+	});
+	return;
+} else {
+	(async () => {
+		try {
+			const removebgOptions = commandLineArgs(optionDefinitions, { argv })
+			injectEnvVars(removebgOptions);
+			if (!validateRemovebgOptions(removebgOptions)) return;
 
-				// create output directory
-				if (removebgOptions['output-directory']) {
-					try {
-						fs.mkdirSync(removebgOptions['output-directory'], {recursive: true});
-					} catch (err) {
-						console.log(err);
-					}
+			// create output directory
+			if (removebgOptions['output-directory']) {
+				try {
+					fs.mkdirSync(removebgOptions['output-directory'], {recursive: true});
+				} catch (err) {
+					console.log(err);
 				}
-
-				// expand input path(s)
-				var expandedInputPaths = expandPaths(mainOptions.command); // input file is in the mainOptions.command
-
-				var confirmBatchOver = 50;
-				if (removebgOptions['confirm-batch-over']) {
-					confirmBatchOver = parseInt(removebgOptions['confirm-batch-over']);
-				}
-
-				var needsConfirmation = expandedInputPaths.length > confirmBatchOver;
-				if (needsConfirmation) {
-					const response = await prompts.confirm({message: `Do you want to process ${expandedInputPaths.length} images?`});
-					if (!response) {
-						return;
-					}
-					invokeRemovebg(mainOptions, removebgOptions, expandedInputPaths);
-				} else {
-					invokeRemovebg(mainOptions, removebgOptions, expandedInputPaths);
-				}
-			} catch (e) {
-				console.log(e);
 			}
-		})();
-	}
+
+			// expand input path(s)
+			var expandedInputPaths = expandPaths(mainOptions.commandOrFiles || removebgOptions.files); // input file is in the mainOptions.commandOrFiles or in removebgOptions.files if specified as last commandline argument
+
+			var confirmBatchOver = 50;
+			if (removebgOptions['confirm-batch-over']) {
+				confirmBatchOver = parseInt(removebgOptions['confirm-batch-over']);
+			}
+
+			var needsConfirmation = expandedInputPaths.length > confirmBatchOver;
+			if (needsConfirmation) {
+				const response = await prompts.confirm({message: `Do you want to process ${expandedInputPaths.length} images?`});
+				if (!response) {
+					return;
+				}
+				invokeRemovebg(mainOptions, removebgOptions, expandedInputPaths);
+			} else {
+				invokeRemovebg(mainOptions, removebgOptions, expandedInputPaths);
+			}
+		} catch (e) {
+			console.log(e);
+		}
+	})();
 }
+
 
 function invokeRemovebg(mainOptions, removebgOptions, expandedInputPaths) {
 	expandedInputPaths.forEach(inputPath => {

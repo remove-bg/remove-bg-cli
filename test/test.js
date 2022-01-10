@@ -55,6 +55,7 @@ describe('removebg zip2png integration tests', () => {
 			}
 			done();
 		}, 5000);*/
+		done();
 	});
 	
 	test('run removebg zip2png -help', done => {
