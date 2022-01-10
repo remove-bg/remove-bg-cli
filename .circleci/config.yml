@@ -6,8 +6,8 @@ orbs:
 
 jobs:
   build:
-    executor:
-      name: win/default
+    working_directory: ~/repo
+    executor: win/default
     steps:
       - checkout
       - node/install-packages:
