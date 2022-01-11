@@ -13,9 +13,7 @@ executors:
   macos:
     macos:
       xcode: 11
-  windows: 
-    name: win/default
-    shell: bash.exe
+  windows: win/default
 
 # Matrices work with jobs that take parameters
 jobs:
