@@ -1,20 +1,34 @@
 version: 2.1
 
+## EXAMPLE 1: I want to test my nodejs project on every version of node and operating system.
+## Then, if all tests pass, I want to deploy my project.
 orbs:
-  node: circleci/node@4.9.0
-  win: circleci/windows@2.2.0 
+  node: circleci/node@1.1.6
+  win: circleci/windows@2.2.0 # The Windows orb give you everything you need to start using the Windows executor.
 
+executors:
+  linux:
+    docker:
+      - image: ubuntu@16.04
+  macos:
+    macos:
+      xcode: 11
+  windows: win/default
+
+# Matrices work with jobs that take parameters
 jobs:
   build:
-    executor: win/default
+    parameters:
+      os:
+        type: string
+      node_version:
+        type: integer
+      run_integration_tests:
+        type: boolean
+    executor: << parameters.os >>
     steps:
-      - checkout
-      - run: nvm install 8.10.0
-      - run: nvm use 8.10.0
-      - run: node -v
-      - run: npm install --global --production windows-build-tools --vs2015
-      - run: npm install node-gyp
-      - run: npm install node-gyp -g
+      - node/install:
+          node-version: << parameters.node_version >>
       - run: npm run build
       - store_artifacts:      
           path: dist
@@ -23,24 +37,51 @@ jobs:
           paths:
             - dist/*
             - test/*      
-  test:
-    executor:
-      name: win/default
-    steps:
-      - attach_workspace:
-          at: .    
-      - run: ls
-      - run: pwd
-      - run:
-         command: test/test.sh
-         shell: bash.exe   
-
 
 workflows:
-  version: 2
-  build_and_test:
+  build:
     jobs:
-      - build
-      - test:
+      # A "matrix" here is essentially syntactic sugar for invoking a certain
+      # job many times with different combinations of parameters.
+      - build:
+          # The "matrix" block signifies that this job should be expanded into a
+          # series of jobs, each with a different combination of parameter values
+          matrix:
+            parameters:
+              os: [linux, macos, windows]        # <-- YAML shorthand for lists of values
+              node_version: [14.15.3]
+          # By default each job will be suffixed with "-<< param-1 >>-<< param-2 >>-..."
+          # to avoid collisions, but you can optionally change the naming scheme
+          name: build-on-<< matrix.os >>-with-node-<< matrix.node-version >>
+          # Any other parameter values expressed here will be passed through to
+          # each invocation
+          run_integration_tests: true
+      - deploy:
           requires:
+            # `deploy` won't start until every job in the `test` matrix passes
             - build
+
+# The above config is equivalent to invoking the jobs explicitly like so:
+workflows:
+  build:
+    jobs:
+      - build:
+          name: build-on-linux
+          os: linux
+          node_version: 14.15.3
+          run_integration_tests: true
+      - build:
+          name: build-on-windows
+          os: windows
+          node_version: 14.15.3
+          run_integration_tests: true
+      - build:
+          name: build-on-macos
+          os: macos
+          node_version: 14.15.3
+          run_integration_tests: true
+      - build:
+          requires:
+            - build-on-linux
+            - build-on-windows
+            - build-on-macos
