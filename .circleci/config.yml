@@ -57,6 +57,7 @@ jobs:
             node --version
             npm --version
       - run: npm install
+      - run: dir
       - run: npm run build
       - run: Rename-Item dist\cli.exe cli-windows.exe
       - store_artifacts:      
