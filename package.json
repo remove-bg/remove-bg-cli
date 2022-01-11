@@ -29,10 +29,5 @@
 	"devDependencies": {
 		"execa": "^5.0.0",
 		"jest": "^27.4.2"
-	},
-	"pkg": {
-		"assets": [
-			".\\node_modules\\canvas\\build\\Release\\**"
-		]
 	}
 }
