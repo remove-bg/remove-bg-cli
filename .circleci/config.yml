@@ -28,10 +28,11 @@ jobs:
     executor: << parameters.os >>
     steps:
       - checkout
-      - node/install:
-          node-version: "14.15.3"
-      - run: npm run build --
-      - run: mv dist/cli dist/cli-<< parameters.os >>
+      - run: nvm install 14.15.3
+      - run: nvm use 14.15.3
+      - run: node -v
+      - run: npm run build
+      #- run: mv dist/cli dist/cli-<< parameters.os >>
       - store_artifacts:      
           path: dist
       - persist_to_workspace:
