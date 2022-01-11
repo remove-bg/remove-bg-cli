@@ -46,6 +46,12 @@ jobs:
       - checkout
       - run: nvm install 14.15.3
       - run: nvm use 14.15.3
+      - run: npm install -g npm
+      - run:
+          name: Verify Versions
+          command: |
+            node --version
+            npm --version
       - run: npm run build
       - run: ren dist/cli.exe dist/cli-windows.exe
       - store_artifacts:      
