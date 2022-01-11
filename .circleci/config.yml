@@ -27,6 +27,7 @@ jobs:
         type: boolean
     executor: << parameters.os >>
     steps:
+      - checkout
       - node/install:
           node-version: "14.15.3"
       - run: npm run build
