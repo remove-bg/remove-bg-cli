@@ -9,7 +9,7 @@ orbs:
 executors:
   linux:
     docker:
-      - image: ubuntu@16.04
+      - image: cimg/base:2021.04
   macos:
     macos:
       xcode: 11
