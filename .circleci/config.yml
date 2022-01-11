@@ -3,7 +3,7 @@ version: 2.1
 ## EXAMPLE 1: I want to test my nodejs project on every version of node and operating system.
 ## Then, if all tests pass, I want to deploy my project.
 orbs:
-  node: circleci/node@2.0.0
+  node: circleci/node@5.0.0
   win: circleci/windows@2.2.0 # The Windows orb give you everything you need to start using the Windows executor.
 
 executors:
