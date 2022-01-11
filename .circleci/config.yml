@@ -44,9 +44,14 @@ jobs:
     executor: windows
     steps:
       - checkout
-      - run: nvm install 14.15.3
+      - run: nvm install 14.15.3 --latest-npm
       - run: nvm use 14.15.3
-      - run: npx npm@7 install -g npm@7
+      - run:
+          name: Verify Versions
+          command: |
+            node --version
+            npm --version
+      - run: npx npm@8 install -g npm@8
       - run:
           name: Verify Versions
           command: |
@@ -54,7 +59,7 @@ jobs:
             npm --version
       - run: npm install
       - run: npm run build
-      - run: ren dist/cli.exe dist/cli-windows.exe
+      - run: Rename-Item dist/cli.exe dist/cli-windows.exe
       - store_artifacts:      
           path: dist
       - persist_to_workspace:
