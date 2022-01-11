@@ -25,9 +25,7 @@ jobs:
         type: integer
       run_integration_tests:
         type: boolean
-    executor: 
-      name: << parameters.os >>
-      shell: "bash.exe"
+    executor: << parameters.os >>
     steps:
       - checkout
       - node/install:
