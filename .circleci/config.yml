@@ -3,7 +3,7 @@ version: 2.1
 ## EXAMPLE 1: I want to test my nodejs project on every version of node and operating system.
 ## Then, if all tests pass, I want to deploy my project.
 orbs:
-  node: circleci/node@5.0.0
+  node: circleci/node@2.0.0
   win: circleci/windows@2.2.0 # The Windows orb give you everything you need to start using the Windows executor.
 
 executors:
@@ -28,9 +28,8 @@ jobs:
     executor: << parameters.os >>
     steps:
       - checkout
-      - run: nvm install 14.15.3
-      - run: nvm use 14.15.3
-      - run: node -v
+      - node/install:
+          node-version: "14.15.3"
       - run: npm run build
       #- run: mv dist/cli dist/cli-<< parameters.os >>
       - store_artifacts:      
@@ -39,7 +38,22 @@ jobs:
           root: .
           paths:
             - dist/*
-            - test/*      
+            - test/*    
+  build-windows:
+    executor: windows
+    steps:
+      - checkout
+      - run: nvm install 14.15.3
+      - run: nvm use 14.15.3
+      - run: npm run build  
+      - store_artifacts:      
+          path: dist
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist/*
+            - test/*    
+
 
 workflows:
   build:
@@ -51,7 +65,7 @@ workflows:
           # series of jobs, each with a different combination of parameter values
           matrix:
             parameters:
-              os: [linux, macos, windows]        # <-- YAML shorthand for lists of values
+              os: [linux, macos]        # <-- YAML shorthand for lists of values
               node_version: [14]
           # By default each job will be suffixed with "-<< param-1 >>-<< param-2 >>-..."
           # to avoid collisions, but you can optionally change the naming scheme
@@ -59,3 +73,4 @@ workflows:
           # Any other parameter values expressed here will be passed through to
           # each invocation
           run_integration_tests: true
+      - build-windows
