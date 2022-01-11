@@ -27,8 +27,10 @@ jobs:
     steps:
       - checkout
       - node/install:
-          node-version: 14.15.3
           install-npm: true          
+          node-version: 14.15.3
+          npm-version: 8.3.0
+
       - run: npm run build
       - run: mv dist/cli dist/cli-<< parameters.os >>
       - store_artifacts:      
