@@ -46,13 +46,13 @@ jobs:
       - checkout
       - run: nvm install 14.15.3
       - run: nvm use 14.15.3
-      - run: npm install -g npm-windows-upgrade
-      - run: npm-windows-upgrade --npm-version 8.3.0
+      - run: npx npm@7 install -g npm@7
       - run:
           name: Verify Versions
           command: |
             node --version
             npm --version
+      - run: npm install
       - run: npm run build
       - run: ren dist/cli.exe dist/cli-windows.exe
       - store_artifacts:      
