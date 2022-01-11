@@ -35,6 +35,7 @@ jobs:
           command: |
             node --version
             npm --version
+      - run: npm i nexe --global
       - run: npm run build
       - run: mv dist/cli dist/cli-<< parameters.os >>
       - store_artifacts:      
@@ -56,6 +57,7 @@ jobs:
           command: |
             node --version
             npm --version
+      - run: npm i nexe --global
       - run: npm install
       - run: dir
       - run: npm run build
