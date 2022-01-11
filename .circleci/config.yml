@@ -35,7 +35,7 @@ jobs:
           command: |
             node --version
             npm --version
-      - run: ls
+      - run: npm i
       - run: npm run build
       - run: mv dist/cli dist/cli-<< parameters.os >>
       - store_artifacts:      
