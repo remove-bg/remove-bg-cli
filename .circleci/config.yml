@@ -60,28 +60,3 @@ workflows:
           requires:
             # `deploy` won't start until every job in the `test` matrix passes
             - build
-
-# The above config is equivalent to invoking the jobs explicitly like so:
-workflows:
-  build:
-    jobs:
-      - build:
-          name: build-on-linux
-          os: linux
-          node_version: 14.15.3
-          run_integration_tests: true
-      - build:
-          name: build-on-windows
-          os: windows
-          node_version: 14.15.3
-          run_integration_tests: true
-      - build:
-          name: build-on-macos
-          os: macos
-          node_version: 14.15.3
-          run_integration_tests: true
-      - build:
-          requires:
-            - build-on-linux
-            - build-on-windows
-            - build-on-macos
