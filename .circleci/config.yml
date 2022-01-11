@@ -49,7 +49,7 @@ workflows:
           matrix:
             parameters:
               os: [linux, macos, windows]        # <-- YAML shorthand for lists of values
-              node_version: [14.15.3]
+              node_version: [14]
           # By default each job will be suffixed with "-<< param-1 >>-<< param-2 >>-..."
           # to avoid collisions, but you can optionally change the naming scheme
           name: build-on-<< matrix.os >>-with-node-<< matrix.node_version >>
