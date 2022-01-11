@@ -47,7 +47,7 @@ jobs:
       - run: nvm install 14.15.3
       - run: nvm use 14.15.3
       - run: npm install -g npm-windows-upgrade
-      - run: npm-windows-upgrade
+      - run: npm-windows-upgrade --npm-version 8.3.0
       - run:
           name: Verify Versions
           command: |
