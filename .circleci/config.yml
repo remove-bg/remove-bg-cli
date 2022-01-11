@@ -12,7 +12,7 @@ executors:
       - image: cimg/base:2021.04
   macos:
     macos:
-      xcode: 11
+      xcode: 12
   windows: win/default
 
 # Matrices work with jobs that take parameters
@@ -21,15 +21,14 @@ jobs:
     parameters:
       os:
         type: string
-      node_version:
-        type: integer
       run_integration_tests:
         type: boolean
     executor: << parameters.os >>
     steps:
       - checkout
       - node/install:
-          node-version: "14.15.3"
+          node-version: 14.15.3
+          install-npm: true          
       - run: npm run build
       #- run: mv dist/cli dist/cli-<< parameters.os >>
       - store_artifacts:      
@@ -54,7 +53,6 @@ jobs:
             - dist/*
             - test/*    
 
-
 workflows:
   build:
     jobs:
@@ -66,10 +64,9 @@ workflows:
           matrix:
             parameters:
               os: [linux, macos]        # <-- YAML shorthand for lists of values
-              node_version: [14]
           # By default each job will be suffixed with "-<< param-1 >>-<< param-2 >>-..."
           # to avoid collisions, but you can optionally change the naming scheme
-          name: build-on-<< matrix.os >>-with-node-<< matrix.node_version >>
+          name: build-on-<< matrix.os >>
           # Any other parameter values expressed here will be passed through to
           # each invocation
           run_integration_tests: true
