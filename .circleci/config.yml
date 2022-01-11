@@ -58,7 +58,7 @@ jobs:
             npm --version
       - run: npm install
       - run: npm run build
-      - run: Rename-Item dist/cli.exe dist/cli-windows.exe
+      - run: Rename-Item dist\cli.exe cli-windows.exe
       - store_artifacts:      
           path: dist
       - persist_to_workspace:
