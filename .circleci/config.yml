@@ -13,7 +13,9 @@ executors:
   macos:
     macos:
       xcode: 11
-  windows: win/default
+  windows: 
+    name: win/default
+    shell: bash.exe
 
 # Matrices work with jobs that take parameters
 jobs:
@@ -30,7 +32,8 @@ jobs:
       - checkout
       - node/install:
           node-version: "14.15.3"
-      - run: npm run build
+      - run: npm run build --
+      - run: mv dist/cli dist/cli-<< parameters.os >>
       - store_artifacts:      
           path: dist
       - persist_to_workspace:
