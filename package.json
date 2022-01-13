@@ -10,7 +10,7 @@
 	"bin": "cli.js",
 	"scripts": {
 		"test": "jest test/test.js",
-		"build": "npx --yes pkg package.json -o dist/cli"
+		"build": "npx --yes pkg package.json -o dist/cli -t host"
 	},
 	"dependencies": {
 		"ag-psd": "^14.3.2",
