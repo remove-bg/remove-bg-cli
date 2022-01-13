@@ -4,7 +4,7 @@ const JSZip = require('jszip');
 const { writePsdBuffer } = require('ag-psd');
 const {parsePngFormat} = require('png-dpi-reader-writer');
 const fs = require('fs');
-const { Image, createCanvas } = require.resolve('canvas'); // for nexe
+const { Image, createCanvas } = require('canvas');
 
 class ImageResizer {
   constructor(file) {

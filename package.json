@@ -10,7 +10,7 @@
 	"bin": "cli.js",
 	"scripts": {
 		"test": "jest test/test.js",
-		"build": "npx --yes nexe cli.js -o dist/cli -r \"./node_modules/**/*\" -t 14.15.3"
+		"build": "npx --yes pkg package.json -o dist/cli"
 	},
 	"dependencies": {
 		"ag-psd": "^14.3.2",
@@ -29,5 +29,9 @@
 	"devDependencies": {
 		"execa": "^5.0.0",
 		"jest": "^27.4.2"
+	},
+	"pkg": {
+		"scripts": "cli.js",
+		"assets": [ "node_modules/canvas/build/Release/**" ]
 	}
 }
