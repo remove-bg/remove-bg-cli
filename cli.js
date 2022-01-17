@@ -66,7 +66,12 @@ if (mainOptions.commandOrFiles && mainOptions.commandOrFiles[0] === 'zip2png') {
 			}
 
 			// expand input path(s)
-			var expandedInputPaths = expandPaths(mainOptions.commandOrFiles || removebgOptions.files); // input file is in the mainOptions.commandOrFiles or in removebgOptions.files if specified as last commandline argument
+			var pathsToExpand = mainOptions.commandOrFiles || removebgOptions.files;
+			if (pathsToExpand == undefined) {
+				console.error("No input files or paths given.");
+				return;
+			}
+			var expandedInputPaths = expandPaths(pathsToExpand); // input file is in the mainOptions.commandOrFiles or in removebgOptions.files if specified as last commandline argument
 
 			var confirmBatchOver = 50;
 			if (removebgOptions['confirm-batch-over']) {
