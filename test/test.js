@@ -1,68 +1,71 @@
 const fs = require('fs');
 const execa = require('execa');
-const { exec } = require('child_process');
+let path = require('path');
+let exec = require('child_process').exec;
 
 const commandLineArgs = require('command-line-args')
 
-const { validateRemovebgOptions, optionDefinitions, mainDefinitions, injectEnvVars } = require ('../lib/options')
-const {expandPaths} = require('../lib/storage');
+const { validateRemovebgOptions, optionDefinitions, mainDefinitions, injectEnvVars } = require('../lib/options')
+const { expandPaths } = require('../lib/storage');
+const { JPEGStream } = require('canvas');
 
 function optionsFromArgv(args) {
 	const mainOptions = commandLineArgs(mainDefinitions, { stopAtFirstUnknown: true, argv: args })
 	const argv = mainOptions._unknown || []
-	
+
 	const removebgOptions = commandLineArgs(optionDefinitions, { argv })
-	injectEnvVars(removebgOptions);	
+	injectEnvVars(removebgOptions);
 	return removebgOptions;
 }
 
-jest.setTimeout(10000);
+function cli(args, cwd) {
+	return new Promise(resolve => {
+		console.log(path.resolve('./cli'));
+		exec(`node ${path.resolve('./cli')} ${args}`,
+			{ cwd },
+			(error, stdout, stderr) => {
+				resolve({code: error && error.code ? error.code : 0, error, stdout, stderr});
+			});
+	})
+}
+
+beforeEach(function () {
+	jest.setTimeout(2000) // ms
+});
+
 describe('removebg integration tests', () => {
-	test('run removebg --help', done => {
-		exec('node ./cli.js zip2png --help', (err, out) => {
-			expect(out.includes('remove.bg CLI help')).toBe(true);
-			done();			
-		});
+	test('run removebg --help', async () => {
+		let result = await cli('zip2png --help');
+		expect(result.stdout).toContain('Usage');	
 	});
 
-	test('run removebg -h', done => {
-		exec('node ./cli.js zip2png -h', (err, out) => {
-			expect(out.includes('remove.bg CLI help')).toBe(true);
-			done();			
-		});
+	test('run removebg -h', async () => {
+		let result = await cli("zip2png -h");
+		expect(result.stdout).toContain('Usage');
 	});
 });
 
-jest.setTimeout(100000);
-
 describe('removebg zip2png integration tests', () => {
-	test('run removebg zip2png with cli (missing file)', done =>  {
-		exec('node ./cli.js zip2png --file=test.zip', (err, out) => {
-			expect(err.message.includes("no such file or directory, open 'test.zip'")).toBe(true);
-			done();
-		});
+	test('run removebg zip2png with cli (missing file)', async () => {
+		let result = await cli('zip2png --file=test.zip');
+		expect(result.stderr).toContain("no such file or directory, open 'test.zip'");
 	});
 
-	test('run removebg zip2png with cli (test/files/test.zip)', done => {
-		/*exec('node ./cli.js zip2png --file=test/files/test.zip')
-		setTimeout(() => {
-			try {
-				var outputPath = 'test/files/test.png';
-				expect(fs.existsSync(outputPath)).toBe(true);
-				fs.unlinkSync(outputPath);
-			} catch (e) {
-				console.log(e);
-			}
-			done();
-		}, 5000);*/
-		done();
+	test('run removebg zip2png with cli (test/files/test.zip)', async () => {
+
+		let result = await cli("zip2png --file='/Users/brew/Documents/kaleido test images/cli/test.zip'")
+		try {
+			var outputPath = 'test/files/test.png';
+			expect(fs.existsSync(outputPath)).toBe(true);
+			fs.unlinkSync(outputPath);
+		} catch (e) {
+			console.log(e);
+		}
 	});
-	
-	test('run removebg zip2png -help', done => {
-		exec('node ./cli.js zip2png --help', (err, out) => {
-			expect(out.includes("remove.bg CLI help")).toBe(true);
-			done();			
-		});
+
+	test('run removebg zip2png -help', async () => {
+		let result = await cli('zip2png --help');
+		expect(result.stdout).toContain('Usage');
 	});
 });
 
