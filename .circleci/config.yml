@@ -49,8 +49,8 @@ jobs:
     executor: windows
     steps:
       - checkout
-      - run: nvm install 16.14.0
-      - run: nvm use 16.14.0
+      - run: nvm install 16.3.2
+      - run: nvm use 16.3.2
       - run:
           name: Verify Versions
           command: |
