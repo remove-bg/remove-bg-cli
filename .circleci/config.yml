@@ -49,9 +49,8 @@ jobs:
     executor: windows
     steps:
       - checkout
-      - run: nvm install 14.15.3
-      - run: nvm use 14.15.3
-      - run: npx npm@8 install -g npm@8.3.1
+      - run: nvm install 16.14.0
+      - run: nvm use 16.14.0
       - run:
           name: Verify Versions
           command: |
