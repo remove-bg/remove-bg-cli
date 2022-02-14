@@ -58,7 +58,8 @@ jobs:
             npm --version
       - run: npm install
       - run: dir
-      - run: npm run build
+      - run: npm i -g pkg
+      - run: pkg package.json -o dist/cli -t host
       - run: Rename-Item dist\cli.exe cli-windows.exe
       - store_artifacts:      
           path: dist
