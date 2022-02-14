@@ -29,7 +29,7 @@ jobs:
       - node/install:
           install-npm: true          
           node-version: 14.15.3
-          npm-version: 8.3.0
+          npm-version: 8.3.1
       - run:
           name: Verify Versions
           command: |
@@ -51,7 +51,7 @@ jobs:
       - checkout
       - run: nvm install 14.15.3
       - run: nvm use 14.15.3
-      - run: npx npm@8 install -g npm@8
+      - run: npx npm@8 install -g npm@8.3.1
       - run:
           name: Verify Versions
           command: |
