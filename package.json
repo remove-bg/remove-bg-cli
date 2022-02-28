@@ -1,0 +1,41 @@
+{
+	"name": "remove-bg-cli",
+	"description": "Remove image backgrounds with remove.bg using the command line",
+	"repository": "https://github.com/remove-bg/remove-bg-cli",
+	"author": "Kaleido AI GmbH",
+	"email" : "hello@kaleido.ai",
+	"private": true,
+	"engines": {
+		"node": "14.18.1"
+	},
+	"bin": "cli.js",
+	"scripts": {
+		"test": "jest test/test.js",
+		"build": "pkg package.json -o dist/removebg -t host"
+	},
+	"dependencies": {
+		"ag-psd": "^14.3.2",
+		"canvas": "^2.8.0",
+		"canvas-exif-orientation": "^0.4.0",
+		"cli-progress": "^3.9.1",
+		"command-line-args": "^5.2.0",
+		"command-line-usage": "^6.1.1",
+		"dotenv": "^16.0.0",
+		"filereader": "^0.10.3",
+		"glob": "^7.2.0",
+		"jszip": "^3.7.1",
+		"png-dpi-reader-writer": "^0.2.4",
+		"prompts": "^2.4.2",
+		"superagent": "^6.1.0"
+	},
+	"devDependencies": {
+		"execa": "^5.0.0",
+		"jest": "^27.4.2"
+	},
+	"pkg": {
+		"scripts": "cli.js",
+		"assets": [
+			"node_modules/canvas/build/Release/**"
+		]
+	}
+}

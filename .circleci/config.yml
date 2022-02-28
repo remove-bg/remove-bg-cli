@@ -1,0 +1,92 @@
+version: 2.1
+orbs:
+  node: circleci/node@2.0.0
+  win: circleci/windows@2.2.0 # The Windows orb give you everything you need to start using the Windows executor.
+
+executors:
+  linux:
+    docker:
+      - image: cimg/base:2021.04
+  macos:
+    macos:
+      xcode: 12
+  windows: win/default
+
+# Matrices work with jobs that take parameters
+jobs:
+  build:
+    parameters:
+      os:
+        type: string
+      run_integration_tests:
+        type: boolean
+    executor: << parameters.os >>
+    steps:
+      - checkout
+      - node/install:
+          install-npm: true          
+          node-version: 14.15.3
+          npm-version: 8.3.1
+      - run:
+          name: Verify Versions
+          command: |
+            node --version
+            npm --version
+      - run: npm i
+      - run: npm i --prefix=$HOME/.local -g pkg
+      - run: ls -la $HOME/.local
+      - run: ls -la $HOME/.local/bin
+      - run: echo 'export PATH=$HOME/.local/bin:$PATH' >> $BASH_ENV
+      - run: echo $PATH
+      - run: which pkg
+      - run: npm run build
+      - run: tar -czvf dist/removebg_cli_VERSION_<< parameters.os >>.tar.gz dist/removebg
+      - store_artifacts:      
+          path: dist
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist/*
+            - test/*    
+  build-windows:
+    executor: windows
+    steps:
+      - checkout
+      - run: nvm install 16.3.2
+      - run: nvm use 16.3.2
+      - run:
+          name: Verify Versions
+          command: |
+            node --version
+            npm --version
+      - run: npm install
+      - run: dir
+      - run: npm i -g pkg
+      - run: npm run build
+      - run: Compress-Archive -LiteralPath dist\removebg.exe -DestinationPath dist\removebg_cli_VERSION_windows.zip
+      - store_artifacts:      
+          path: dist
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist/*
+            - test/*    
+
+workflows:
+  build:
+    jobs:
+      # A "matrix" here is essentially syntactic sugar for invoking a certain
+      # job many times with different combinations of parameters.
+      - build:
+          # The "matrix" block signifies that this job should be expanded into a
+          # series of jobs, each with a different combination of parameter values
+          matrix:
+            parameters:
+              os: [linux, macos]        # <-- YAML shorthand for lists of values
+          # By default each job will be suffixed with "-<< param-1 >>-<< param-2 >>-..."
+          # to avoid collisions, but you can optionally change the naming scheme
+          name: build-on-<< matrix.os >>
+          # Any other parameter values expressed here will be passed through to
+          # each invocation
+          run_integration_tests: true
+      - build-windows
