@@ -18,7 +18,7 @@ brew install remove-bg/homebrew-tap/removebg
 
 Download the .zip or .tar.gz from the [releases page][releases] and unzip with your favorite decompression tool. Then move the binary to a folder in your path.
 
-[releases]: https://github.com/remove-bg/remove-bg-cli/releases/tag/2.0.0
+[releases]: https://github.com/remove-bg/remove-bg-cli/releases/
 
 ## Usage
 
