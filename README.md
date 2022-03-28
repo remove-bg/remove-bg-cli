@@ -144,6 +144,14 @@ removebg large.jpg --size full --format png
 removebg car.jpg --type car --extra-api-options 'add_shadow=true&semitransparency=true'
 ```
 
+### zip2png
+
+The zip2png command is now included in the remove.bg command line interface. Pass the result zip file from remove.bg as parameter and the command converts it into a transparent png file.
+
+```
+removebg zip2png --file /path/to/file.zip 
+```
+
 ## Development
 
 Prerequisites:
