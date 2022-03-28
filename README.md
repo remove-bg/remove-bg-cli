@@ -1,6 +1,6 @@
 # remove.bg CLI
 
-[![CircleCI](https://circleci.com/gh/remove-bg/go.svg?style=shield)](https://circleci.com/gh/remove-bg/go)
+[![CircleCI](https://circleci.com/gh/remove-bg/remove-bg-cli.svg?style=shield)](https://circleci.com/gh/remove-bg/remove-bg-cli)
 
 ## Installation
 
@@ -14,19 +14,11 @@ You can **[download latest stable release][releases]** (Windows, Mac, and Linux 
 brew install remove-bg/homebrew-tap/removebg
 ```
 
-### deb / rpm
+### Installation
 
-Download the .deb or .rpm from the [releases page][releases] and install with
-`dpkg -i` and `rpm -i`.
+Download the .zip or .tar.gz from the [releases page][releases] and unzip with your favorite decompression tool. Then move the binary to a folder in your path.
 
-For the latest `deb` package supporting `x86-64` you can also run:
-
-```
-curl -LO $(curl https://api.github.com/repos/remove-bg/go/releases/latest | grep -o "https://github.com/remove-bg/go/releases/download/.*linux_amd64.deb")
-sudo dpkg -i removebg*.deb
-```
-
-[releases]: https://github.com/remove-bg/go/releases
+[releases]: https://github.com/remove-bg/remove-bg-cli/releases/
 
 ## Usage
 
@@ -150,6 +142,14 @@ removebg large.jpg --size full --format png
 
 # Processing a car image with additional API options
 removebg car.jpg --type car --extra-api-options 'add_shadow=true&semitransparency=true'
+```
+
+# zip2png
+
+The zip2png command is now included in the remove.bg command line interface. Pass the result zip file from remove.bg as parameter and the command converts it into a transparent png file.
+
+```
+removebg zip2png --file /path/to/file.zip 
 ```
 
 ## Development
