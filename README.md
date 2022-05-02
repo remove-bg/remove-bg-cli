@@ -127,9 +127,9 @@ Please see the [API documentation][api-docs] for further details.
 - `--channels`
 - `--bg-color`
 - `--format` (default: `png`)
-- `--extra-api-options` for forwarding any unlisted/new options to the API
-  - Formatted as a URI encoded string (`=` between key/value, delimited with `&`)
-  - e.g. `--extra-api-options 'crop=true&add_shadow=true'`
+- `--extra-api-option` for forwarding any unlisted/new option to the API
+  - Formatted as key/value pair (`=` between key/value)
+  - it is possible to use this option multiple times e.g. `--extra-api-option crop=true --extra-api-option add_shadow=true`
 
 ## Examples
 
@@ -141,7 +141,7 @@ removebg subject.jpg --format jpg --bg-color 7a7a7a --output-directory processed
 removebg large.jpg --size full --format png
 
 # Processing a car image with additional API options
-removebg car.jpg --type car --extra-api-options 'add_shadow=true&semitransparency=true'
+removebg car.jpg --type car --extra-api-option add_shadow=true --extra-api-option semitransparency=true
 ```
 
 # zip2png
