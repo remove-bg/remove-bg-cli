@@ -7,6 +7,7 @@ const { prompts } = require('prompts')
 const cliProgress = require('cli-progress');
 const fs = require('fs');
 const { version } = require('./lib/client');
+const Queue = require('better-queue');
 
 /* first - parse the main command */
 
@@ -97,10 +98,25 @@ if (mainOptions.commandOrFiles && mainOptions.commandOrFiles[0] === 'zip2png') {
 
 
 function invokeRemovebg(mainOptions, removebgOptions, expandedInputPaths) {
+	let batchSize = 10;
+	const queue = new Queue(function (batch, cb) {
+		let done = 0;
+		batch.forEach(inputPath => {
+			var bar = multibar.create(100, 0, {file: inputPath, message: 'Processing:'})
+			removebg(inputPath, removebgOptions, bar, function () {
+				done ++;
+				if (done == batchSize) {
+					cb();
+				}
+			});
+		})
+	}, { batchSize: batchSize });
+	
 	expandedInputPaths.forEach(inputPath => {
-		var bar = multibar.create(100, 0, {file: inputPath, message: 'Processing:'})
-		removebg(inputPath, removebgOptions, bar);
+		queue.push(inputPath);
 	})
+
+
 }
 
 
