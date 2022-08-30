@@ -9,7 +9,7 @@ executors:
       - image: cimg/base:2021.04
   macos:
     macos:
-      xcode: 13
+      xcode: 14
   windows: win/default
 
 # Matrices work with jobs that take parameters
