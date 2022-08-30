@@ -20,7 +20,8 @@ const multibar = new cliProgress.MultiBar({
 	barCompleteChar: '\u2588',
 	barIncompleteChar: '\u2591',
 	clearOnComplete: false,
-	stopOnComplete: true
+	stopOnComplete: true,
+	forceRedraw: true
 });
 
 if (Object.entries( mainOptions).length === 0 || mainOptions._unknown && (mainOptions._unknown[0] === '--help' || mainOptions._unknown[0] === '-h')) {
