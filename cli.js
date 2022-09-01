@@ -98,7 +98,7 @@ if (mainOptions.commandOrFiles && mainOptions.commandOrFiles[0] === 'zip2png') {
 
 
 function invokeRemovebg(mainOptions, removebgOptions, expandedInputPaths) {
-	let batchSize = 10;
+	let batchSize = 5;
 	const queue = new Queue(function (batch, cb) {
 		let done = 0;
 		batch.forEach(inputPath => {
