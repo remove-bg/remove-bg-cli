@@ -7,6 +7,7 @@ const { prompts } = require('prompts')
 const cliProgress = require('cli-progress');
 const fs = require('fs');
 const { version } = require('./lib/client');
+const Queue = require('better-queue');
 
 /* first - parse the main command */
 
@@ -20,7 +21,8 @@ const multibar = new cliProgress.MultiBar({
 	barCompleteChar: '\u2588',
 	barIncompleteChar: '\u2591',
 	clearOnComplete: false,
-	stopOnComplete: true
+	stopOnComplete: true,
+	forceRedraw: true
 });
 
 if (Object.entries( mainOptions).length === 0 || mainOptions._unknown && (mainOptions._unknown[0] === '--help' || mainOptions._unknown[0] === '-h')) {
@@ -96,10 +98,25 @@ if (mainOptions.commandOrFiles && mainOptions.commandOrFiles[0] === 'zip2png') {
 
 
 function invokeRemovebg(mainOptions, removebgOptions, expandedInputPaths) {
+	let batchSize = 5;
+	const queue = new Queue(function (batch, cb) {
+		let done = 0;
+		batch.forEach(inputPath => {
+			var bar = multibar.create(100, 0, {file: inputPath, message: 'Processing:'})
+			removebg(inputPath, removebgOptions, bar, function () {
+				done ++;
+				if (done == batchSize) {
+					cb();
+				}
+			});
+		})
+	}, { batchSize: batchSize });
+	
 	expandedInputPaths.forEach(inputPath => {
-		var bar = multibar.create(100, 0, {file: inputPath, message: 'Processing:'})
-		removebg(inputPath, removebgOptions, bar);
+		queue.push(inputPath);
 	})
+
+
 }
 
 

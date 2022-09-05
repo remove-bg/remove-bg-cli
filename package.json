@@ -3,9 +3,9 @@
 	"description": "Remove image backgrounds with remove.bg using the command line",
 	"repository": "https://github.com/remove-bg/remove-bg-cli",
 	"author": "Kaleido AI GmbH",
-	"email" : "hello@kaleido.ai",
+	"email": "hello@kaleido.ai",
 	"private": true,
-	"version": "2.0.0",
+	"version": "2.0.1",
 	"engines": {
 		"node": "14.18.1"
 	},
@@ -16,6 +16,7 @@
 	},
 	"dependencies": {
 		"ag-psd": "^14.3.2",
+		"better-queue": "^3.8.10",
 		"canvas": "^2.8.0",
 		"canvas-exif-orientation": "^0.4.0",
 		"cli-progress": "^3.9.1",
