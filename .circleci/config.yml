@@ -12,6 +12,10 @@ executors:
       xcode: 13.4.1
   windows: win/default
 
+filters: &filters
+  tags:
+    only: /^\d+\.\d+\.\d+$/
+
 # Matrices work with jobs that take parameters
 jobs:
   build:
@@ -89,4 +93,6 @@ workflows:
           # Any other parameter values expressed here will be passed through to
           # each invocation
           run_integration_tests: true
-      - build-windows
+          filters: *filters
+      - build-windows:
+          filters: *filters
