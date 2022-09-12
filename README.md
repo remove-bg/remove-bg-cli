@@ -116,6 +116,10 @@ by default to save credits. Specify this flag to force reprocessing.
 - `--confirm-batch-over` (default `50`) - Prompt for confirmation before
 processing batches over this size. Specify `-1` to disable this safeguard.
 
+- `--skip-png-format-optimization` - By default the cli calls the API with `zip` format for maximum output resolution. 
+When specifying this flag it will use `png` format to save bandwidth by limiting the output resolution to 10 megapixels.
+
+
 #### Image processing options
 
 Please see the [API documentation][api-docs] for further details.
