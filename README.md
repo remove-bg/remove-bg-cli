@@ -183,3 +183,4 @@ npm run build
 
 - npm i -g pkg
 - npm run build
+test
