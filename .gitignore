@@ -120,3 +120,4 @@ dist
 tmp
 
 .vscode
+.git/
