@@ -130,6 +130,7 @@ Please see the [API documentation][api-docs] for further details.
 - `--type`
 - `--channels`
 - `--bg-color`
+- `--bg-image-file`
 - `--format` (default: `png`)
 - `--extra-api-option` for forwarding any unlisted/new option to the API
   - Formatted as key/value pair (`=` between key/value)
