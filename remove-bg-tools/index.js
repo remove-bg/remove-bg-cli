@@ -466,7 +466,9 @@ class ZipCanvas {
       var image = new Image();
       image.crossOrigin = 'anonymous';
       image.onload = function () { resolve(image) };
-      image.onerror = function () { reject("Failed to load image") };
+      image.onerror = function (e) { 
+        reject("Failed to load image") 
+      };
       image.src = data;
     });
   }

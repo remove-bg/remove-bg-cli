@@ -17,7 +17,7 @@
 	"dependencies": {
 		"ag-psd": "^14.3.2",
 		"better-queue": "^3.8.10",
-		"canvas": "^2.8.0",
+		"canvas": "^2.11.2",
 		"canvas-exif-orientation": "^0.4.0",
 		"cli-progress": "^3.9.1",
 		"command-line-args": "^5.2.0",
