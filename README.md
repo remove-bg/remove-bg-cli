@@ -23,7 +23,7 @@ Download the .zip or .tar.gz from the [releases page][releases] and unzip with y
 ## Usage
 
 ```
-removebg [options] <file>...
+removebg [options] <file> ...
 ```
 
 ### API key
