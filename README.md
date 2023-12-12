@@ -1,7 +1,3 @@
-# remove.bg CLI
-
-[![CircleCI](https://circleci.com/gh/remove-bg/remove-bg-cli.svg?style=shield)](https://circleci.com/gh/remove-bg/remove-bg-cli)
-
 ## Installation
 
 ### Download
