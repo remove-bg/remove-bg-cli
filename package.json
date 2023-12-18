@@ -7,7 +7,7 @@
 	"private": true,
 	"version": "2.0.3",
 	"engines": {
-		"node": "14.18.1"
+		"node": "16.20.2"
 	},
 	"bin": "cli.js",
 	"scripts": {
@@ -28,7 +28,7 @@
 		"jszip": "^3.7.1",
 		"png-dpi-reader-writer": "^0.2.4",
 		"prompts": "^2.4.2",
-		"superagent": "^6.1.0"
+		"superagent": "^8.1.2"
 	},
 	"devDependencies": {
 		"execa": "^5.0.0",
