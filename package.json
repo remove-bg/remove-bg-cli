@@ -7,7 +7,7 @@
 	"private": true,
 	"version": "2.0.3",
 	"engines": {
-		"node": "14.18.1"
+		"node": "16.20.2"
 	},
 	"bin": "cli.js",
 	"scripts": {
@@ -32,7 +32,8 @@
 	},
 	"devDependencies": {
 		"execa": "^5.0.0",
-		"jest": "^27.4.2"
+		"jest": "^27.4.2",
+		"pkg": "^5.8.1"
 	},
 	"pkg": {
 		"scripts": "cli.js",
