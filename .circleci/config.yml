@@ -39,6 +39,13 @@ jobs:
           command: |
             node --version
             npm --version
+      # Install Rosetta if on Apple Silicon
+      - when:
+          condition: << parameters.os == 'macos' >>
+          steps:
+            - run:
+                name: Install Rosetta
+                command: softwareupdate --install-rosetta --agree-to-license
       - run:
           name: Build
           command: |
