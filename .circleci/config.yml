@@ -40,8 +40,15 @@ jobs:
                 name: Install Rosetta
                 command: softwareupdate --install-rosetta --agree-to-license
             - run:
+                name: Install dependencies
+                command: |
+                  arch -arm64 brew install pkg-config cairo pango jpeg \
+                    giflib librsvg
+            - run:
                 name: Install Setuptools
-                command: brew install python-setuptools
+                command: |
+                  pip install --upgrade pip setuptools
+                  pyenv rehash
       - checkout
       - node/install:
           node-version: 16.20.2
