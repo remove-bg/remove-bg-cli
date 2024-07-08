@@ -2,8 +2,8 @@
 version: 2.1
 
 orbs:
-  node: circleci/node@2.1
-  win: circleci/windows@2.4
+  node: circleci/node@5.2
+  win: circleci/windows@5.0
 
 executors:
   linux:
@@ -14,7 +14,7 @@ executors:
     macos:
       xcode: 15.4.0
     resource_class: macos.m1.medium.gen1
-  windows: win/default
+
 
 filters: &filters
   tags:
@@ -41,9 +41,7 @@ jobs:
                 command: softwareupdate --install-rosetta --agree-to-license
       - checkout
       - node/install:
-          install-npm: true
           node-version: 16.20.2
-          npm-version: 8.19.4
       - run:
           name: Verify Versions
           command: |
@@ -73,11 +71,14 @@ jobs:
             - test/*
 
   build-windows:
-    executor: windows
+    executor: win/default
     steps:
       - checkout
-      - run: nvm install 16.20.2
-      - run: nvm use 16.20.2
+      - run:
+          name: Install Node
+          command: |
+            nvm install 16.20.2
+            nvm use 16.20.2
       - run:
           name: Verify Versions
           command: |
