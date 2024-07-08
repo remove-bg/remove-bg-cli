@@ -33,6 +33,7 @@ jobs:
       - node/install:
           install-npm: true
           node-version: 16.20.2
+          npm-version: 8.19.4
       - run:
           name: Verify Versions
           command: |
