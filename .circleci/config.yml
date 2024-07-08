@@ -50,15 +50,18 @@ jobs:
             node --version
             npm --version
       - run:
-          name: Build
+          name: Install
           command: |
             npm i
             npm i --prefix=$HOME/.local -g pkg
             ls -la $HOME/.local
             ls -la $HOME/.local/bin
             echo 'export PATH=$HOME/.local/bin:$PATH' >> $BASH_ENV
-            echo $PATH
-            which pkg
+      - run:
+          name: Build
+          command: |
+            echo "Path: $PATH"
+            echo "pkg location: $(which pkg)"
             npm run build
             tar -czvf dist/removebg_cli_VERSION_<< parameters.os >>.tar.gz dist/removebg
       - store_artifacts:
@@ -81,11 +84,14 @@ jobs:
             node --version
             npm --version
       - run:
-          name: Build
+          name: Install
           command: |
             npm install
             dir
             npm i -g pkg
+      - run:
+          name: Build
+          command: |
             npm run build
             Compress-Archive -LiteralPath dist\removebg.exe -DestinationPath dist\removebg_cli_VERSION_windows.zip
       - store_artifacts:
