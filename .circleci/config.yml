@@ -31,7 +31,8 @@ jobs:
     steps:
       # Install Rosetta if on Apple Silicon
       - when:
-          condition: << parameters.os == 'macos' >>
+          condition:
+            equal: ["macos", << parameters.os >>]
           steps:
             - run:
                 name: Install Rosetta
