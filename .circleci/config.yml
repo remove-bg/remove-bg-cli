@@ -39,6 +39,9 @@ jobs:
             - run:
                 name: Install Rosetta
                 command: softwareupdate --install-rosetta --agree-to-license
+            - run:
+                name: Install Setuptools
+                command: brew install python-setuptools
       - checkout
       - node/install:
           node-version: 16.20.2
