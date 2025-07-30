@@ -22,7 +22,7 @@
 		"cli-progress": "^3.9.1",
 		"command-line-args": "^5.2.0",
 		"command-line-usage": "^6.1.1",
-		"dotenv": "^16.4.7",
+		"dotenv": "^16.6.1",
 		"filereader": "^0.10.3",
 		"glob": "^7.2.0",
 		"jszip": "^3.7.1",
