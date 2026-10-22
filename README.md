@@ -157,7 +157,7 @@ removebg zip2png --file /path/to/file.zip
 
 Prerequisites:
 
-- `nodejs 14.18.1`
+- `nodejs 22.23.4`
 
 Getting started:
 
