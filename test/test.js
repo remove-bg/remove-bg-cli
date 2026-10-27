@@ -5,7 +5,6 @@ let exec = require('child_process').exec;
 
 const { createCanvas, loadImage } = require('canvas');
 const { createRemovebgZip } = require('./helpers/fixtures');
-require('dotenv').config()
 
 function cli(args, cwd) {
 	return new Promise(resolve => {

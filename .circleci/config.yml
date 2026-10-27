@@ -51,7 +51,7 @@ jobs:
                   pyenv rehash
       - checkout
       - node/install:
-          node-version: 16.20.2
+          node-version: 24.22.1
       - run:
           name: Verify Versions
           command: |
@@ -61,7 +61,7 @@ jobs:
           name: Install
           command: |
             npm i
-            npm i --prefix=$HOME/.local -g pkg
+            npm i --prefix=$HOME/.local -g @yao-pkg/pkg
             ls -la $HOME/.local
             ls -la $HOME/.local/bin
             echo 'export PATH=$HOME/.local/bin:$PATH' >> $BASH_ENV
@@ -87,8 +87,8 @@ jobs:
       - run:
           name: Install Node
           command: |
-            nvm install 16.20.2
-            nvm use 16.20.2
+            nvm install 24.22.1
+            nvm use 24.22.1
       - run:
           name: Verify Versions
           command: |
@@ -99,7 +99,7 @@ jobs:
           command: |
             npm install
             dir
-            npm i -g pkg
+            npm i -g @yao-pkg/pkg
       - run:
           name: Build
           command: |

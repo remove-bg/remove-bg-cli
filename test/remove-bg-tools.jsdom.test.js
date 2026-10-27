@@ -138,7 +138,9 @@ afterEach(() => {
 });
 
 describe('ImageResizer#reduce', () => {
-	test('jpeg in a browser without native EXIF support is rotated by its EXIF orientation', async () => {
+	// node-canvas 3 applies the EXIF orientation while decoding (like Chrome 81+), but
+	// ImageResizer still rotates manually when supportsNativeExif() is false.
+	test('BUG: jpeg in a browser without native EXIF support is rotated twice under node-canvas 3', async () => {
 		// default jsdom UA -> supportsNativeExif() === false -> canvas-exif-orientation path
 		const jpeg = withExif(twoToneCanvas().toBuffer('image/jpeg', { quality: 1 }), {
 			orientation: 6,
@@ -159,10 +161,10 @@ describe('ImageResizer#reduce', () => {
 		});
 		expect(result.blob.type).toBe('image/jpeg');
 		const out = await decode(await readBlob(result.blob));
-		// orientation 6 = rotate 90deg clockwise: 4x2 becomes 2x4, red (left) ends up on top
-		expect([out.width, out.height]).toEqual([2, 4]);
-		expectColor(out.px(0, 0), [255, 0, 0, 255]);
-		expectColor(out.px(1, 3), [0, 0, 255, 255]);
+		// orientation 6 = rotate 90deg clockwise, applied twice: 4x2 -> 2x4 -> 4x2, red (left) ends up right
+		expect([out.width, out.height]).toEqual([4, 2]);
+		expectColor(out.px(0, 0), [0, 0, 255, 255]);
+		expectColor(out.px(3, 1), [255, 0, 0, 255]);
 		// the object URL is released and the image dropped afterwards
 		expect(mockUrl.createObjectURL).toHaveBeenCalledWith(file);
 		expect(mockUrl.revokeObjectURL).toHaveBeenCalledWith(mockUrl.createObjectURL.mock.results[0].value);
@@ -170,15 +172,16 @@ describe('ImageResizer#reduce', () => {
 		expect(resizer.image).toBeNull();
 	});
 
-	test('jpeg in a browser with native EXIF support (Chrome 90) is not rotated again', async () => {
+	test('jpeg in a browser with native EXIF support (Chrome 90) is rotated once, by the decoder', async () => {
 		setUserAgent(CHROME_90);
 		const jpeg = withExif(twoToneCanvas().toBuffer('image/jpeg', { quality: 1 }), { orientation: 6 });
 		const result = await new ImageResizer(jpegFile(jpeg)).reduce();
 
 		const out = await decode(await readBlob(result.blob));
-		expect([out.width, out.height]).toEqual([4, 2]);
+		// orientation 6 = rotate 90deg clockwise: 4x2 becomes 2x4, red (left) ends up on top
+		expect([out.width, out.height]).toEqual([2, 4]);
 		expectColor(out.px(0, 0), [255, 0, 0, 255]);
-		expectColor(out.px(3, 1), [0, 0, 255, 255]);
+		expectColor(out.px(1, 3), [0, 0, 255, 255]);
 		expect(result.resolutionInfo).toEqual(expect.objectContaining({ horizontalResolution: 72, verticalResolution: 72 }));
 	});
 

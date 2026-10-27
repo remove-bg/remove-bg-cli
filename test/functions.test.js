@@ -1,7 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const nock = require('nock');
+const nock = require('nock').default; // nock 15 is ESM-only; needs --experimental-vm-modules under Jest
 const { loadImage, createCanvas } = require('canvas');
 const { removebg, zip2png } = require('../lib/functions');
 const { userAgent } = require('../lib/client');
