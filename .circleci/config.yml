@@ -71,7 +71,8 @@ jobs:
             echo "Path: $PATH"
             echo "pkg location: $(which pkg)"
             npm run build
-            tar -czvf dist/removebg_cli_VERSION_<< parameters.os >>.tar.gz dist/removebg
+            VERSION=$(node -p "require('./package.json').version")
+            tar -czvf dist/removebg_cli_${VERSION}_<< parameters.os >>.tar.gz dist/removebg
       - store_artifacts:
           path: dist
       - persist_to_workspace:
@@ -104,7 +105,8 @@ jobs:
           name: Build
           command: |
             npm run build
-            Compress-Archive -LiteralPath dist\removebg.exe -DestinationPath dist\removebg_cli_VERSION_windows.zip
+            $version = node -p "require('./package.json').version"
+            Compress-Archive -LiteralPath dist\removebg.exe -DestinationPath "dist\removebg_cli_${version}_windows.zip"
       - store_artifacts:
           path: dist
       - persist_to_workspace:
