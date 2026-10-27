@@ -157,7 +157,8 @@ removebg zip2png --file /path/to/file.zip
 
 Prerequisites:
 
-- `nodejs 14.18.1`
+- `nodejs 16.20.2` (see `.tool-versions`)
+- Native libraries for [node-canvas](https://github.com/Automattic/node-canvas#compiling), e.g. on macOS: `brew install pkg-config cairo pango jpeg giflib librsvg`
 
 Getting started:
 
@@ -167,6 +168,12 @@ cd remove-bg-cli
 npm i
 npm run build
 npm run test
+```
+
+To run the tests with a coverage report (written to `coverage/`, HTML report at `coverage/index.html`):
+
+```
+npm run test:coverage
 ```
 
 To build & try out locally:
