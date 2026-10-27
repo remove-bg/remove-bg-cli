@@ -39,10 +39,11 @@ if (mainOptions.commandOrFiles && mainOptions.commandOrFiles[0] === 'zip2png') {
 	const zip2pngDefinitions = [
 		{ name: 'file', defaultOption: true }
 	]
-	const zip2pngOptions = commandLineArgs(zip2pngDefinitions, { argv })
+	// a positional zip file ends up in commandOrFiles, after the command itself
+	const zip2pngOptions = commandLineArgs(zip2pngDefinitions, { argv: mainOptions.commandOrFiles.slice(1).concat(argv) })
 
 	var binary = fs.readFileSync(zip2pngOptions.file);
-	var resultPath = zip2pngOptions.file.replace('zip', 'png');
+	var resultPath = zip2pngOptions.file.replace(/\.zip$/i, '') + '.png';
 	let bar = multibar.create(100, 0, {file: `${zip2pngOptions.file} -> ${resultPath}`, message: 'Processing:'});
 
 	zip2png(binary, { resultPath: resultPath, progressCallback: (percent) => {

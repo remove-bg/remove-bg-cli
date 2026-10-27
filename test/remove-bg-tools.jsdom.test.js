@@ -46,7 +46,8 @@ const mockUrl = {
 	revokeObjectURL: jest.fn(),
 };
 jest.doMock('url', () => ({ ...jest.requireActual('url'), ...mockUrl }));
-const { ImageResizer, ZipCanvas } = require('../remove-bg-tools');
+const CanvasExifOrientation = require('canvas-exif-orientation');
+const { ImageResizer, ZipCanvas, BrowserCompatibility } = require('../remove-bg-tools');
 
 const CHROME_90 = 'Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36';
 const defaultUserAgent = navigator.userAgent;
@@ -123,9 +124,18 @@ function pngFile(buf, name = 'photo.png') {
 	return new File([buf], name, { type: 'image/png' });
 }
 
-function isPending(promise, ms = 50) {
-	return Promise.race([promise.then(() => false, () => false), new Promise(r => setTimeout(() => r(true), ms))]);
+// Fails fast (instead of hitting the Jest timeout) when a promise never settles
+function settleWithin(promise, ms = 1000) {
+	let timer;
+	const timeout = new Promise((_, reject) => {
+		timer = setTimeout(() => reject(new Error(`did not settle within ${ms}ms`)), ms);
+	});
+	return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
+
+// 2x1 red GIF89a (node-canvas decodes GIF, but not e.g. WebP). Uniform, because a 2px wide
+// jpeg re-encode averages the chroma of neighbouring pixels.
+const RED_GIF_2X1 = Buffer.from('R0lGODlhAgABAIAAAP8AAAAA/ywAAAAAAgABAAACAgQKADs=', 'base64');
 
 beforeEach(() => {
 	mockUrl.createObjectURL.mockClear();
@@ -138,10 +148,10 @@ afterEach(() => {
 });
 
 describe('ImageResizer#reduce', () => {
-	// node-canvas 3 applies the EXIF orientation while decoding (like Chrome 81+), but
-	// ImageResizer still rotates manually when supportsNativeExif() is false.
-	test('BUG: jpeg in a browser without native EXIF support is rotated twice under node-canvas 3', async () => {
-		// default jsdom UA -> supportsNativeExif() === false -> canvas-exif-orientation path
+	// node-canvas 3 applies the EXIF orientation while decoding (like every current browser),
+	// so getBlob must not rotate again, whatever the user agent says.
+	test('jpeg with EXIF orientation is rotated exactly once (default jsdom UA)', async () => {
+		const drawImage = jest.spyOn(CanvasExifOrientation, 'drawImage');
 		const jpeg = withExif(twoToneCanvas().toBuffer('image/jpeg', { quality: 1 }), {
 			orientation: 6,
 			xRes: [300, 1],
@@ -161,15 +171,45 @@ describe('ImageResizer#reduce', () => {
 		});
 		expect(result.blob.type).toBe('image/jpeg');
 		const out = await decode(await readBlob(result.blob));
-		// orientation 6 = rotate 90deg clockwise, applied twice: 4x2 -> 2x4 -> 4x2, red (left) ends up right
-		expect([out.width, out.height]).toEqual([4, 2]);
-		expectColor(out.px(0, 0), [0, 0, 255, 255]);
-		expectColor(out.px(3, 1), [255, 0, 0, 255]);
+		// orientation 6 = rotate 90deg clockwise: 4x2 becomes 2x4, red (left) ends up on top
+		expect([out.width, out.height]).toEqual([2, 4]);
+		expectColor(out.px(0, 0), [255, 0, 0, 255]);
+		expectColor(out.px(1, 3), [0, 0, 255, 255]);
+		expect(drawImage).not.toHaveBeenCalled();
 		// the object URL is released and the image dropped afterwards
 		expect(mockUrl.createObjectURL).toHaveBeenCalledWith(file);
 		expect(mockUrl.revokeObjectURL).toHaveBeenCalledWith(mockUrl.createObjectURL.mock.results[0].value);
 		expect(resizer.url).toBeNull();
 		expect(resizer.image).toBeNull();
+	});
+
+	test('rotates manually with canvas-exif-orientation when the decoder does not apply EXIF orientation', async () => {
+		setUserAgent(CHROME_90); // the user agent is irrelevant, only the decoder probe counts
+		const probe = jest.spyOn(BrowserCompatibility, 'decoderAppliesExifOrientation').mockResolvedValue(false);
+		const drawImage = jest.spyOn(CanvasExifOrientation, 'drawImage');
+		const jpeg = withExif(twoToneCanvas().toBuffer('image/jpeg', { quality: 1 }), { orientation: 6 });
+		const resizer = new ImageResizer(jpegFile(jpeg));
+		await resizer.loadEXIF(resizer.file);
+		await resizer.loadImage();
+		const image = resizer.image;
+
+		const result = await resizer.getBlob();
+
+		expect(probe).toHaveBeenCalledTimes(1);
+		expect(drawImage).toHaveBeenCalledTimes(1);
+		// node-canvas already rotated the 4x2 source to 2x4
+		expect(drawImage).toHaveBeenCalledWith(image, 6, 0, 0, 2, 4);
+		const out = await decode(await readBlob(result.blob));
+		const manual = drawImage.mock.results[0].value;
+		expect([out.width, out.height]).toEqual([manual.width, manual.height]);
+	});
+
+	test('png never goes through the EXIF probe or manual rotation', async () => {
+		const probe = jest.spyOn(BrowserCompatibility, 'decoderAppliesExifOrientation');
+		const drawImage = jest.spyOn(CanvasExifOrientation, 'drawImage');
+		await new ImageResizer(pngFile(twoToneCanvas().toBuffer('image/png'))).reduce();
+		expect(probe).not.toHaveBeenCalled();
+		expect(drawImage).not.toHaveBeenCalled();
 	});
 
 	test('jpeg in a browser with native EXIF support (Chrome 90) is rotated once, by the decoder', async () => {
@@ -249,10 +289,29 @@ describe('ImageResizer#reduce', () => {
 		expect(resizer.url).toBeNull();
 	});
 
-	test('BUG: never settles for file types other than jpeg/png', async () => {
-		const file = new File([Buffer.from('GIF89a')], 'anim.gif', { type: 'image/gif' });
-		// loadImageResolutionInfo only resolves for jpeg/png, so reduce() hangs forever
-		await expect(isPending(new ImageResizer(file).reduce())).resolves.toBe(true);
+	test('other types that node-canvas can decode (GIF) are converted to jpeg without resolutionInfo', async () => {
+		const file = new File([RED_GIF_2X1], 'anim.gif', { type: 'image/gif' });
+		const resizer = new ImageResizer(file);
+
+		const result = await settleWithin(resizer.reduce());
+
+		expect(file.exifdata).toBeUndefined();
+		expect(result.resolutionInfo).toBeUndefined();
+		expect(result.blob.type).toBe('image/jpeg');
+		const out = await decode(await readBlob(result.blob));
+		expect([out.width, out.height]).toEqual([2, 1]);
+		// drawn onto the canvas, not just the white background
+		expectColor(out.px(0, 0), [255, 0, 0, 255]);
+		expectColor(out.px(1, 0), [255, 0, 0, 255]);
+		expect(resizer.url).toBeNull();
+	});
+
+	test('other types that cannot be decoded reject with the decode error', async () => {
+		const file = new File([Buffer.from('GIF89a')], 'broken.gif', { type: 'image/gif' });
+		const resizer = new ImageResizer(file);
+		await expect(settleWithin(resizer.reduce())).rejects.toThrow(/error while reading from input stream/);
+		expect(mockUrl.revokeObjectURL).toHaveBeenCalledTimes(1);
+		expect(resizer.url).toBeNull();
 	});
 });
 
@@ -271,11 +330,20 @@ describe('ImageResizer#loadImage / #getBlob', () => {
 		expect(resizer.image).toBeNull();
 	});
 
-	test('BUG: loadImage calls an undefined global unloadImage() when a URL is already set', async () => {
-		const resizer = new ImageResizer(pngFile(twoToneCanvas().toBuffer('image/png')));
+	test('loadImage revokes the previous object URL when called again', async () => {
+		const resizer = new ImageResizer(pngFile(twoToneCanvas(5, 3).toBuffer('image/png')));
 		await resizer.loadImage();
-		// expected: the previous URL is revoked and the image reloaded
-		await expect(resizer.loadImage()).rejects.toThrow(/unloadImage is not defined/);
+		const firstUrl = resizer.url;
+		const firstImage = resizer.image;
+
+		await resizer.loadImage();
+
+		expect(mockUrl.revokeObjectURL).toHaveBeenCalledTimes(1);
+		expect(mockUrl.revokeObjectURL).toHaveBeenCalledWith(firstUrl);
+		expect(mockUrl.createObjectURL).toHaveBeenCalledTimes(2);
+		expect(resizer.url).toBe(mockUrl.createObjectURL.mock.results[1].value);
+		expect(resizer.image).not.toBe(firstImage);
+		expect([resizer.image.width, resizer.image.height]).toEqual([5, 3]);
 	});
 
 	test('getBlob downscales images above 25 megapixels, keeping the aspect ratio', async () => {
@@ -463,8 +531,17 @@ describe('ZipCanvas.fromUrl', () => {
 		await expect(promise).rejects.toBe(errorEvent);
 	});
 
-	test('BUG: omitting the progress callback throws (default `noop` is undefined)', () => {
-		expect(() => ZipCanvas.fromUrl('https://example.com/x.zip')).toThrow(/noop is not defined/);
+	test('works without opts and progress callback (progress defaults to a no-op)', async () => {
+		const zip = await createRemovebgZipBuffer(2, 2);
+		const promise = ZipCanvas.fromUrl('https://example.com/x.zip');
+		const [xhr] = requests;
+		xhr.emit('progress', { lengthComputable: true, loaded: 1, total: 2 });
+		xhr.response = new ArrayBuffer(zip.length);
+		new Uint8Array(xhr.response).set(zip);
+		xhr.emit('load');
+		const zipCanvas = await promise;
+		expect(zipCanvas).toBeInstanceOf(ZipCanvas);
+		expect(zipCanvas.dataUrl).toMatch(/^data:image\/png;base64,/);
 	});
 });
 
@@ -517,15 +594,23 @@ describe('ZipCanvas#download / #createURL / #revokeURL', () => {
 });
 
 describe('ZipCanvas.shrinkImage / dataURLtoFile', () => {
-	test('BUG: shrinkImage never settles because node-canvas Image#src is empty for data: URLs', async () => {
-		const entry = { file: pngFile(twoToneCanvas(8, 4).toBuffer('image/png'), 'input.png') };
+	test('shrinkImage halves the image and replaces the entry file with a PNG', async () => {
+		const entry = { file: pngFile(twoToneCanvas(8, 4).toBuffer('image/png'), 'input.png'), other: 'kept' };
 		const originalFile = entry.file;
 
-		// expected: resolves with entry.width/height 4x2 and a halved PNG File; actually
-		// dataURLtoFile('') throws inside the nested onload, so the promise stays pending
-		await expect(isPending(ZipCanvas.shrinkImage(entry, 123))).resolves.toBe(true);
-		expect(entry.file).toBe(originalFile);
-		expect(entry.width).toBeUndefined();
+		const result = await settleWithin(ZipCanvas.shrinkImage(entry, 123));
+
+		expect(result).toBe(entry);
+		expect(entry.other).toBe('kept');
+		expect([entry.width, entry.height]).toEqual([4, 2]);
+		expect(entry.file).not.toBe(originalFile);
+		expect(entry.file).toBeInstanceOf(File);
+		expect(entry.file.name).toBe('input.png');
+		expect(entry.file.type).toBe('image/png');
+		const out = await decode(await readBlob(entry.file));
+		expect([out.width, out.height]).toEqual([4, 2]);
+		expectColor(out.px(0, 0), [255, 0, 0, 255]);
+		expectColor(out.px(3, 1), [0, 0, 255, 255]);
 	});
 
 	test('dataURLtoFile decodes base64 data URLs into a typed File', async () => {

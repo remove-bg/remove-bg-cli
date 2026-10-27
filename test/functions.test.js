@@ -5,6 +5,7 @@ const nock = require('nock').default; // nock 15 is ESM-only; needs --experiment
 const { loadImage, createCanvas } = require('canvas');
 const { removebg, zip2png } = require('../lib/functions');
 const { userAgent } = require('../lib/client');
+const { ZipCanvas } = require('../remove-bg-tools');
 const { createRemovebgZipBuffer } = require('./helpers/fixtures');
 
 const API = 'https://api.remove.bg';
@@ -299,15 +300,16 @@ describe('removebg errors', () => {
 		await expect(run(inputPath, baseParams)).resolves.toBeUndefined();
 	});
 
-	// Documents current behavior: the non-200 branch references an undefined `response`
-	// variable, so a 2xx other than 200 ends up in the generic error handler.
-	test('treats non-200 success responses as errors', async () => {
+	test.each([true, false])('reports unexpected success statuses (with bar: %s)', async withBar => {
 		nock(API).post('/v1.0/removebg').reply(201, Buffer.from('png'), { 'Content-Type': 'image/png' });
-		const bar = fakeBar();
+		const bar = withBar ? fakeBar() : undefined;
 
 		await run(inputPath, baseParams, bar);
 
-		expect(bar.update).toHaveBeenCalledWith(100, { message: 'Processing Error ReferenceError: response is not defined' });
+		if (bar) {
+			expect(bar.update).toHaveBeenLastCalledWith(100, { message: 'Processing Error: unexpected HTTP status 201' });
+			expect(bar.stop).toHaveBeenCalled();
+		}
 		expect(fs.existsSync(path.join(tmpDir, 'photo-removebg.png'))).toBe(false);
 	});
 
@@ -339,6 +341,14 @@ describe('zip2png', () => {
 		const percents = progress.mock.calls.map(call => call[0]);
 		expect(percents).toEqual([...percents].sort((a, b) => a - b));
 		expect(percents[percents.length - 1]).toBe(100);
+	});
+
+	test('exports the composited image as png', async () => {
+		const fromBinary = jest.spyOn(ZipCanvas, 'fromBinary');
+
+		await zip2png(await createRemovebgZipBuffer(2, 2), { resultPath: path.join(tmpDir, 'x.png'), progressCallback: () => {} });
+
+		expect(fromBinary.mock.calls[0][2].export.mimeType).toBe('image/png');
 	});
 
 	test('rejects invalid zips', async () => {

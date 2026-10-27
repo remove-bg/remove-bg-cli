@@ -368,13 +368,15 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         return buffer;
     }
 
-    function objectURLToBlob(url, callback) {
+    function objectURLToBlob(url, callback, errorCallback) {
         var http = new XMLHttpRequest();
         http.open("GET", url, true);
         http.responseType = "blob";
         http.onload = function (e) {
             if (this.status == 200 || this.status === 0) {
                 callback(this.response);
+            } else if (errorCallback) {
+                errorCallback("Could not load image");
             }
         };
         http.send();
@@ -408,14 +410,14 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
                     };
                     objectURLToBlob(img.src, function (blob) {
                         fileReader.readAsArrayBuffer(blob);
-                    });
+                    }, errorCallback);
                 } else {
                     var http = new XMLHttpRequest();
                     http.onload = function () {
                         if (this.status == 200 || this.status === 0) {
                             handleBinaryFile(http.response);
-                        } else {
-                            throw "Could not load image";
+                        } else if (errorCallback) {
+                            errorCallback("Could not load image");
                         }
                         http = null;
                     };
@@ -514,17 +516,14 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
             if (isFieldSegmentStart(dataView, offset)) {
 
-                // Get the length of the name header (which is padded to an even number of bytes)
-                var nameHeaderLength = dataView.getUint8(offset + 7);
+                // The resource name is a Pascal string at +6 (length byte followed by the characters),
+                // padded so that the length byte plus the characters take an even number of bytes
+                var nameHeaderLength = 1 + dataView.getUint8(offset + 6);
                 if (nameHeaderLength % 2 !== 0) nameHeaderLength += 1;
-                // Check for pre photoshop 6 format
-                if (nameHeaderLength === 0) {
-                    // Always 4
-                    nameHeaderLength = 4;
-                }
 
-                var startOffset = offset + 8 + nameHeaderLength;
-                var sectionLength = dataView.getUint16(offset + 6 + nameHeaderLength);
+                // The name is followed by the 4-byte big-endian data size, then the data
+                var sectionLength = dataView.getUint32(offset + 6 + nameHeaderLength);
+                var startOffset = offset + 6 + nameHeaderLength + 4;
 
                 return readIPTCData(file, startOffset, sectionLength);
 
@@ -559,9 +558,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         while (segmentStartPos < startOffset + sectionLength) {
             if (dataView.getUint8(segmentStartPos) === 0x1C && dataView.getUint8(segmentStartPos + 1) === 0x02) {
                 segmentType = dataView.getUint8(segmentStartPos + 2);
+                dataSize = dataView.getInt16(segmentStartPos + 3);
+                // 5 header bytes plus the data; a negative (extended) size only skips the header
+                segmentSize = 5 + (dataSize > 0 ? dataSize : 0);
                 if (segmentType in IptcFieldMap) {
-                    dataSize = dataView.getInt16(segmentStartPos + 3);
-                    segmentSize = dataSize + 5;
                     fieldName = IptcFieldMap[segmentType];
                     fieldValue = getStringFromDB(dataView, segmentStartPos + 5, dataSize);
                     // Check if we already stored a value with this name
@@ -578,9 +578,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
                         data[fieldName] = fieldValue;
                     }
                 }
-
+                // Skip the whole dataset so bytes inside its data are not parsed as markers
+                segmentStartPos += segmentSize;
             }
-            segmentStartPos++;
+            else {
+                segmentStartPos++;
+            }
         }
         return data;
     }
@@ -724,13 +727,15 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
             // console.log('******** IFD1Offset is empty, image thumb not found ********');
             return {};
         }
-        else if (IFD1OffsetPointer > dataView.byteLength) { // this should not happen
-            // console.log('******** IFD1Offset is outside the bounds of the DataView ********');
+        var IFD1Start = tiffStart + IFD1OffsetPointer;
+        if (IFD1Start + 2 > dataView.byteLength ||
+            IFD1Start + 2 + dataView.getUint16(IFD1Start, !bigEnd) * 12 > dataView.byteLength) { // this should not happen
+            // console.log('******** IFD1 is outside the bounds of the DataView ********');
             return {};
         }
         // console.log('*******  thumbnail IFD offset (IFD1) is: %s', IFD1OffsetPointer);
 
-        var thumbTags = readTags(dataView, tiffStart, tiffStart + IFD1OffsetPointer, IFD1Tags, bigEnd)
+        var thumbTags = readTags(dataView, tiffStart, IFD1Start, IFD1Tags, bigEnd)
 
         // EXIF 2.3 specification for JPEG format thumbnail
 
@@ -750,9 +755,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
                         // extract the thumbnail
                         var tOffset = tiffStart + thumbTags.JpegIFOffset;
                         var tLength = thumbTags.JpegIFByteCount;
-                        thumbTags['blob'] = new Blob([new Uint8Array(dataView.buffer, tOffset, tLength)], {
-                            type: 'image/jpeg'
-                        });
+                        // skip the blob if the thumbnail data runs past the end of the buffer
+                        if (tOffset + tLength <= dataView.byteLength) {
+                            thumbTags['blob'] = new Blob([new Uint8Array(dataView.buffer, tOffset, tLength)], {
+                                type: 'image/jpeg'
+                            });
+                        }
                     }
                     break;
 
@@ -838,7 +846,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
                         case "Sharpness":
                         case "SubjectDistanceRange":
                         case "FileSource":
-                            exifData[tag] = StringValues[tag][exifData[tag]];
+                            // keep the raw value when there is no mapping for it
+                            if (StringValues[tag].hasOwnProperty(exifData[tag])) {
+                                exifData[tag] = StringValues[tag][exifData[tag]];
+                            }
                             break;
 
                         case "ExifVersion":
@@ -901,13 +912,21 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
         var offset = 2,
             length = file.byteLength,
-            dom = new DOMParser();
+            dom = new DOMParser(),
+            xmpHeader = "http://ns.adobe.com/xap/1.0/\x00",
+            segmentLength;
 
-        while (offset < (length - 4)) {
-            if (getStringFromDB(dataView, offset, 4) == "http") {
-                var startOffset = offset - 1;
-                var sectionLength = dataView.getUint16(offset - 2) - 1;
-                var xmpString = getStringFromDB(dataView, startOffset, sectionLength)
+        // walk the JPEG segments, looking for an APP1 segment that starts with the XMP namespace
+        while (offset + 4 <= length) {
+            if (dataView.getUint8(offset) != 0xFF) {
+                return; // not a valid marker (e.g. entropy-coded data), there is no XMP
+            }
+
+            segmentLength = dataView.getUint16(offset + 2);
+            if (dataView.getUint8(offset + 1) == 225 &&
+                segmentLength - 2 >= xmpHeader.length &&
+                getStringFromDB(dataView, offset + 4, xmpHeader.length) == xmpHeader) {
+                var xmpString = getStringFromDB(dataView, offset + 4, segmentLength - 2)
                 var xmpEndIndex = xmpString.indexOf('xmpmeta>') + 8;
                 xmpString = xmpString.substring(xmpString.indexOf('<x:xmpmeta'), xmpEndIndex);
 
@@ -931,7 +950,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
                 var domDocument = dom.parseFromString(xmpString, 'text/xml');
                 return xml2Object(domDocument);
             } else {
-                offset++;
+                offset += 2 + segmentLength;
             }
         }
     }

@@ -18,6 +18,15 @@ async function decodeDataUrl(dataUrl) {
 	return { img, ctx };
 }
 
+// Fails fast (instead of hitting the Jest timeout) when a promise never settles
+function settleWithin(promise, ms = 1000) {
+	let timer;
+	const timeout = new Promise((_, reject) => {
+		timer = setTimeout(() => reject(new Error(`did not settle within ${ms}ms`)), ms);
+	});
+	return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 function recordProgress() {
 	const stages = [];
 	const progress = jest.fn(p => stages.push(p));
@@ -109,9 +118,15 @@ describe('ZipCanvas.fromBinary (as used by the CLI zip2png command)', () => {
 		await expect(ZipCanvas.fromBinary(buf, null, {}, () => {})).rejects.toBe('Failed to load image');
 	});
 
-	test('BUG: omitting the progress callback throws (default is the non-existent ZipCanvas.noop)', () => {
-		expect(ZipCanvas.noop).toBeUndefined();
-		expect(() => ZipCanvas.fromBinary(Buffer.alloc(0))).toThrow(TypeError);
+	test('works without a progress callback (defaults to a no-op)', async () => {
+		const zip = await createRemovebgZipBuffer(2, 2);
+		const zipCanvas = await ZipCanvas.fromBinary(zip);
+		expect(zipCanvas).toBeInstanceOf(ZipCanvas);
+		expect(zipCanvas.dataUrl).toMatch(/^data:image\/png;base64,/);
+	});
+
+	test('rejects (rather than throwing) for bad data without a progress callback', async () => {
+		await expect(ZipCanvas.fromBinary(Buffer.from('not a zip'))).rejects.toThrow(/zip/i);
 	});
 
 	test('passing origData fails in node (no global Blob on node 16, no URL.createObjectURL in require("url"))', async () => {
@@ -139,8 +154,9 @@ describe('ZipCanvas.loadImage / getCanvas', () => {
 		await expect(ZipCanvas.loadImage(Buffer.from('nope'), () => {})).rejects.toBe('Failed to load image');
 	});
 
-	test('BUG: loadImage without a progress callback throws (default `noop` is undefined)', () => {
-		expect(() => ZipCanvas.loadImage(Buffer.alloc(0))).toThrow(ReferenceError);
+	test('loadImage works without a progress callback (defaults to a no-op)', async () => {
+		const img = await ZipCanvas.loadImage(createCanvas(2, 3).toBuffer('image/png'));
+		expect([img.width, img.height]).toEqual([2, 3]);
 	});
 
 	test('getCanvas draws the image onto a same-sized canvas', async () => {
@@ -270,6 +286,12 @@ describe('ImageResizer in node', () => {
 		expect(file.resolutionInfo).toBeUndefined();
 	});
 
+	test.each(['image/gif', 'image/webp', undefined])('loadImageResolutionInfo resolves without resolutionInfo for type %p', async (type) => {
+		const file = { type };
+		await expect(settleWithin(new ImageResizer().loadImageResolutionInfo(file))).resolves.toBeUndefined();
+		expect(file.resolutionInfo).toBeUndefined();
+	});
+
 	test('BUG: loadImage throws in node because require("url") has no createObjectURL', async () => {
 		await expect(new ImageResizer({ type: 'image/png' }).loadImage()).rejects.toThrow(/createObjectURL is not a function/);
 	});
@@ -339,20 +361,112 @@ describe('BrowserCompatibility.supportsNativeExif', () => {
 		expect(BrowserCompatibility.supportsNativeExif()).toBe(false);
 	});
 
-	test('BUG: Chromium versions are mis-parsed (offset +7 for an 8-letter name), falling back to appVersion', () => {
-		withNavigator('Mozilla/5.0 (X11; Linux x86_64) Chromium/90.0.4430.212', '5.0 (X11)');
-		// expected true (Chromium 90 >= 81), but "m/90.0..." parses as NaN and appVersion 5 is used
+	test.each([
+		// the appVersion fallback must not be used: it would give the opposite answer
+		['Chromium 90', true, 'Mozilla/5.0 (X11; Linux x86_64) Chromium/90.0.4430.212', '5.0 (X11)'],
+		['Chromium 80', false, 'Mozilla/5.0 (X11; Linux x86_64) Chromium/80.0.3987.163', '90.0 (X11)'],
+	])('reads the version after the "Chromium" token: %s -> %p', (_, expected, userAgent, appVersion) => {
+		withNavigator(userAgent, appVersion);
+		expect(BrowserCompatibility.supportsNativeExif()).toBe(expected);
+	});
+
+	test('the userAgent argument takes precedence over navigator.userAgent', () => {
+		withNavigator('Mozilla/5.0 (Windows NT 10.0; rv:10.0) Gecko/20100101 Firefox/10.0');
+		const chrome90 = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0 Safari/537.36';
+		expect(BrowserCompatibility.supportsNativeExif(chrome90)).toBe(true);
 		expect(BrowserCompatibility.supportsNativeExif()).toBe(false);
 	});
 
-	test('BUG: the userAgent argument is ignored; only the global navigator is read', () => {
-		withNavigator('Mozilla/5.0 (Windows NT 10.0; rv:10.0) Gecko/20100101 Firefox/10.0');
-		const chrome90 = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0 Safari/537.36';
-		expect(BrowserCompatibility.supportsNativeExif(chrome90)).toBe(false);
+	test('works with a userAgent argument when there is no global navigator', () => {
+		delete global.navigator;
+		expect(BrowserCompatibility.supportsNativeExif('Mozilla/5.0 (X11; rv:90.0) Gecko/20100101 Firefox/90.0')).toBe(true);
+		expect(BrowserCompatibility.supportsNativeExif('Mozilla/5.0 (X11) Chrome/80.0')).toBe(false);
+		// non-numeric version: the appVersion fallback has no navigator to read from
+		expect(BrowserCompatibility.supportsNativeExif('Mozilla/5.0 (X11) Chrome/unknown')).toBe(false);
+		expect(BrowserCompatibility.supportsNativeExif('Mozilla/5.0 (X11) 1234/99')).toBe(false);
 	});
 
-	test('throws in plain node where there is no navigator', () => {
-		if (hadNavigator) return; // Node >= 21 ships a global navigator
-		expect(() => BrowserCompatibility.supportsNativeExif('Chrome/90')).toThrow(ReferenceError);
+	test('returns false when there is neither a userAgent argument nor a global navigator', () => {
+		delete global.navigator;
+		expect(BrowserCompatibility.supportsNativeExif()).toBe(false);
+	});
+
+	test('returns false for the plain node navigator ("Node.js/<version>")', () => {
+		withNavigator('Node.js/24');
+		expect(BrowserCompatibility.supportsNativeExif()).toBe(false);
+	});
+});
+
+describe('BrowserCompatibility.decoderAppliesExifOrientation', () => {
+	const realCanvas = require('canvas');
+
+	// Loads a fresh copy of the module (fresh probe cache) whose `Image` is FakeImage
+	function loadWithImage(FakeImage) {
+		let mod;
+		jest.isolateModules(() => {
+			jest.doMock('canvas', () => ({ ...realCanvas, Image: FakeImage }));
+			mod = require('../remove-bg-tools');
+		});
+		jest.dontMock('canvas');
+		return mod.BrowserCompatibility;
+	}
+
+	function fakeImage(onSrc) {
+		return class FakeImage {
+			set src(value) {
+				this.loadedSrc = value;
+				onSrc(this);
+			}
+		};
+	}
+
+	test('resolves true under node-canvas 3, which applies the EXIF orientation itself', async () => {
+		await expect(settleWithin(BrowserCompatibility.decoderAppliesExifOrientation())).resolves.toBe(true);
+	});
+
+	test('the probe result is cached', () => {
+		const first = BrowserCompatibility.decoderAppliesExifOrientation();
+		expect(first).toBeInstanceOf(Promise);
+		expect(BrowserCompatibility.decoderAppliesExifOrientation()).toBe(first);
+	});
+
+	test('the probe is a 2x1 JPEG that EXIF Orientation 6 turns into 1x2', async () => {
+		let src;
+		const BC = loadWithImage(fakeImage(img => {
+			src = img.loadedSrc;
+			img.width = 1;
+			img.height = 2;
+			img.onload();
+		}));
+		await BC.decoderAppliesExifOrientation();
+
+		expect(src).toMatch(/^data:image\/jpeg;base64,/);
+		const jpeg = Buffer.from(src.split(',')[1], 'base64');
+		const rotated = await loadImage(jpeg);
+		expect([rotated.width, rotated.height]).toEqual([1, 2]);
+		// the first segment after SOI is the EXIF APP1; without it the image is 2x1
+		expect(jpeg.readUInt16BE(2)).toBe(0xffe1);
+		expect(jpeg.toString('binary', 6, 12)).toBe('Exif\0\0');
+		const app1End = 4 + jpeg.readUInt16BE(4);
+		const plain = await loadImage(Buffer.concat([jpeg.subarray(0, 2), jpeg.subarray(app1End)]));
+		expect([plain.width, plain.height]).toEqual([2, 1]);
+	});
+
+	test('resolves false when the probe comes out unrotated (decoder ignores EXIF)', async () => {
+		let created = 0;
+		const BC = loadWithImage(fakeImage(img => {
+			created++;
+			img.width = 2;
+			img.height = 1;
+			img.onload();
+		}));
+		await expect(settleWithin(BC.decoderAppliesExifOrientation())).resolves.toBe(false);
+		await expect(BC.decoderAppliesExifOrientation()).resolves.toBe(false);
+		expect(created).toBe(1);
+	});
+
+	test('assumes true (every current browser applies EXIF orientation) when the probe fails to load', async () => {
+		const BC = loadWithImage(fakeImage(img => img.onerror(new Error('blocked by CSP'))));
+		await expect(settleWithin(BC.decoderAppliesExifOrientation())).resolves.toBe(true);
 	});
 });

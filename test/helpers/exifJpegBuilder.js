@@ -152,12 +152,14 @@ function iptcRecord(dataset, value, record = 2) {
 	return [0x1C, record, dataset, (bytes.length >>> 8) & 0xff, bytes.length & 0xff].concat(bytes);
 }
 
-// Photoshop APP13 with a single 8BIM 0x0404 (IPTC) resource. `nameBytes` are the two bytes
-// following the resource id (an empty, padded Pascal string by default).
-function iptcSegment(records, nameBytes = [0, 0], sizeBytes) {
+// Photoshop APP13 with a single 8BIM 0x0404 (IPTC) resource, laid out per the Photoshop image
+// resource format: '8BIM', 2-byte id, the resource name as a Pascal string (length byte + chars,
+// padded with a NUL so the total is even), a 4-byte big-endian data size, then the data.
+function iptcSegment(records, name = '') {
 	const data = [].concat(...records);
-	const size = sizeBytes || u32(data.length, true);
-	return segment(0xED, ascii('Photoshop 3.0').concat([0], ascii('8BIM'), [0x04, 0x04], nameBytes, size, data));
+	const pascalName = [name.length].concat(ascii(name));
+	if (pascalName.length % 2) pascalName.push(0);
+	return segment(0xED, ascii('Photoshop 3.0').concat([0], ascii('8BIM'), [0x04, 0x04], pascalName, u32(data.length, true), data));
 }
 
 function jpeg(...segments) {

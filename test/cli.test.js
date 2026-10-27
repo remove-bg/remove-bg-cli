@@ -99,6 +99,29 @@ describe('zip2png command', () => {
 		expect(bars[0].update.mock.calls).toEqual([[42], [100, { message: 'Processed:' }]]);
 	});
 
+	test('accepts the zip as a positional argument', async () => {
+		const zipPath = path.join(tmpDir, 'result.zip');
+		fs.writeFileSync(zipPath, 'zip bytes');
+		const { zip2png } = runCli(['zip2png', zipPath]);
+		await settle();
+
+		expect(zip2png).toHaveBeenCalledWith(Buffer.from('zip bytes'), expect.objectContaining({ resultPath: path.join(tmpDir, 'result.png') }));
+	});
+
+	test.each([
+		['a directory named like "zip"', ['zips', 'archive.zip'], ['zips', 'archive.png']],
+		['an upper-case extension', ['PHOTO.ZIP'], ['PHOTO.png']],
+		['no .zip extension', ['result.bin'], ['result.bin.png']],
+	])('derives the png path from the file name only (%s)', async (_, input, expected) => {
+		const zipPath = path.join(tmpDir, ...input);
+		fs.mkdirSync(path.dirname(zipPath), { recursive: true });
+		fs.writeFileSync(zipPath, 'zip bytes');
+		const { zip2png } = runCli(['zip2png', '--file', zipPath]);
+		await settle();
+
+		expect(zip2png.mock.calls[0][1].resultPath).toBe(path.join(tmpDir, ...expected));
+	});
+
 	test('throws for a missing zip file', () => {
 		expect(() => runCli(['zip2png', '--file', path.join(tmpDir, 'missing.zip')])).toThrow('ENOENT');
 	});

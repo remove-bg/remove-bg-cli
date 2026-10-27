@@ -300,9 +300,22 @@ describe('readFromBinaryFile edge cases', () => {
 		expect(tags.GPSVersionID).toBeUndefined();
 	});
 
-	test('maps Exif enum values missing from StringValues to undefined', () => {
-		// Documents current behaviour: the raw value (0x02, a reserved Flash value) is lost
-		const tags = read(jpeg(exifSegment(buildTiff({ exif: [{ tag: 0x9209, type: 3, values: 0x02 }] }))));
+	test('keeps the raw value of Exif enums missing from StringValues', () => {
+		// 0x02 is a reserved Flash value, 99 is not a defined LightSource
+		const tags = read(jpeg(exifSegment(buildTiff({
+			exif: [
+				{ tag: 0x9209, type: 3, values: 0x02 },
+				{ tag: 0x9208, type: 3, values: 99 },
+				{ tag: 0x9207, type: 3, values: 3 },
+			],
+		}))));
+		expect(tags.Flash).toBe(2);
+		expect(tags.LightSource).toBe(99);
+		expect(tags.MeteringMode).toBe('Spot');
+	});
+
+	test('keeps undecodable Exif enum values as undefined', () => {
+		const tags = read(jpeg(exifSegment(buildTiff({ exif: [{ tag: 0x9209, type: 8, values: 1 }] }))));
 		expect(Object.keys(tags)).toContain('Flash');
 		expect(tags.Flash).toBeUndefined();
 	});
@@ -380,24 +393,52 @@ describe('readFromBinaryFile edge cases', () => {
 			expect(logSpy).toHaveBeenCalledTimes(3);
 		});
 
-		test('IFD1 offset inside byteLength but past the end once tiffStart is added', () => {
-			// Documents a bug: the bounds check ignores tiffStart, so this throws instead of returning {}
+	});
+
+	describe('IFD1 that does not fit in the buffer', () => {
+		// `at(length, tiffStart)` gives the absolute position of the IFD1 directory. The file
+		// always ends with FF D9, so a directory starting at length - 2 claims 0xD9FF entries.
+		test.each([
+			['inside byteLength but past the end once tiffStart is added', length => length - 2],
+			['with its entry count straddling the end', (length, tiffStart) => length - 1 - tiffStart],
+			['with entries running past the end', (length, tiffStart) => length - 2 - tiffStart],
+		])('returns an empty thumbnail for an IFD1 offset %s', (label, at) => {
 			const opts = { ifd0: [{ tag: 0x0112, type: 3, values: 3 }], ifd1Offset: 0 };
 			const probe = jpeg(exifSegment(buildTiff(opts)));
 			expect(tiffStartOf(probe)).toBeGreaterThan(2);
-			opts.ifd1Offset = probe.length - 2;
-			expect(() => read(jpeg(exifSegment(buildTiff(opts))))).toThrow(RangeError);
+			opts.ifd1Offset = at(probe.length, tiffStartOf(probe));
+			expect(read(jpeg(exifSegment(buildTiff(opts))))).toEqual({ Orientation: 3, thumbnail: {} });
+		});
+	});
+
+	describe('JPEG thumbnail that does not fit in the buffer', () => {
+		const thumbJpeg = (offset, length) => jpeg(exifSegment(buildTiff({
+			ifd0: [{ tag: 0x0112, type: 3, values: 3 }],
+			exif: [{ tag: 0x8827, type: 3, values: 200 }],
+			ifd1: [
+				{ tag: 0x0103, type: 3, values: 6 },
+				{ tag: 0x0201, type: 4, values: offset },
+				{ tag: 0x0202, type: 4, values: length },
+			],
+		})));
+		const withThumb = (offset, length) => read(thumbJpeg(offset, length));
+
+		test.each([
+			['byte count', 8, 100000],
+			['offset', 100000, 4],
+		])('keeps the tags but attaches no blob when the %s is past the end', (label, offset, length) => {
+			const tags = withThumb(offset, length);
+			expect(tags.Orientation).toBe(3);
+			expect(tags.ISOSpeedRatings).toBe(200);
+			expect(tags.thumbnail).toEqual({ Compression: 6, JpegIFOffset: offset, JpegIFByteCount: length });
 		});
 
-		test('JPEG thumbnail extending past the end of the buffer', () => {
-			const tiff = buildTiff({
-				ifd1: [
-					{ tag: 0x0103, type: 3, values: 6 },
-					{ tag: 0x0201, type: 4, values: 8 },
-					{ tag: 0x0202, type: 4, values: 100000 },
-				],
-			});
-			expect(() => read(jpeg(exifSegment(tiff)))).toThrow(RangeError);
+		test('still attaches a thumbnail that ends exactly at the end of the buffer', async () => {
+			const probe = thumbJpeg(0, 0);
+			// the last two bytes of the file are the EOI marker
+			const tags = withThumb(probe.length - tiffStartOf(probe) - 2, 2);
+			expect(tags.thumbnail.blob).toBeInstanceOf(Blob);
+			expect(await readBlob(tags.thumbnail.blob)).toEqual([0xFF, 0xD9]);
 		});
 	});
 });
@@ -535,23 +576,31 @@ describe('EXIF.getData', () => {
 			expect(img.exifdata.Make).toBe('Canon Inc.');
 		});
 
-		test('throws from the load handler on a non-200 response', () => {
+		test.each(['http://example.com/missing.jpg', 'https://example.com/missing.jpg'])(
+			'reports a non-200 response for %s through errorCallback',
+			src => {
+				const img = { src };
+				const callback = jest.fn();
+				const errorCallback = jest.fn();
+				expect(EXIF.getData(img, callback, errorCallback)).toBe(true);
+				const xhr = FakeXHR.instances[0];
+				xhr.status = 404;
+				expect(() => xhr.onload()).not.toThrow();
+				expect(errorCallback).toHaveBeenCalledTimes(1);
+				expect(errorCallback).toHaveBeenCalledWith('Could not load image');
+				expect(callback).not.toHaveBeenCalled();
+				expect(img.exifdata).toBeUndefined();
+			}
+		);
+
+		test('does not throw on a non-200 response without an errorCallback', () => {
 			const img = { src: 'http://example.com/missing.jpg' };
 			const callback = jest.fn();
-			const errorCallback = jest.fn();
-			EXIF.getData(img, callback, errorCallback);
+			EXIF.getData(img, callback);
 			const xhr = FakeXHR.instances[0];
-			xhr.status = 404;
-			let thrown;
-			try {
-				xhr.onload();
-			} catch (err) {
-				thrown = err;
-			}
-			// Documents current behaviour: a string is thrown and errorCallback is never used
-			expect(thrown).toBe('Could not load image');
+			xhr.status = 500;
+			expect(() => xhr.onload()).not.toThrow();
 			expect(callback).not.toHaveBeenCalled();
-			expect(errorCallback).not.toHaveBeenCalled();
 			expect(img.exifdata).toBeUndefined();
 		});
 
@@ -568,18 +617,31 @@ describe('EXIF.getData', () => {
 			expect(img.exifdata.thumbnail.JpegIFByteCount).toBe(THUMB.length);
 		});
 
-		test('never calls back when a blob: URL fails to load', async () => {
+		test('reports a blob: URL that fails to load through errorCallback', async () => {
 			const img = { src: 'blob:http://localhost/gone' };
 			const callback = jest.fn();
 			const errorCallback = jest.fn();
-			EXIF.getData(img, callback, errorCallback);
+			expect(EXIF.getData(img, callback, errorCallback)).toBe(true);
 			const xhr = FakeXHR.instances[0];
 			xhr.status = 404;
-			xhr.onload({});
+			expect(() => xhr.onload({})).not.toThrow();
 			await new Promise(resolve => setTimeout(resolve, 20));
-			// Documents current behaviour: the failure is silently swallowed
+			expect(errorCallback).toHaveBeenCalledTimes(1);
+			expect(errorCallback).toHaveBeenCalledWith('Could not load image');
 			expect(callback).not.toHaveBeenCalled();
-			expect(errorCallback).not.toHaveBeenCalled();
+			expect(img.exifdata).toBeUndefined();
+		});
+
+		test('does not throw when a blob: URL fails to load without an errorCallback', async () => {
+			const img = { src: 'blob:http://localhost/gone' };
+			const callback = jest.fn();
+			EXIF.getData(img, callback);
+			const xhr = FakeXHR.instances[0];
+			xhr.status = 404;
+			expect(() => xhr.onload({})).not.toThrow();
+			await new Promise(resolve => setTimeout(resolve, 20));
+			expect(callback).not.toHaveBeenCalled();
+			expect(img.exifdata).toBeUndefined();
 		});
 	});
 
@@ -681,13 +743,15 @@ describe('IPTC', () => {
 		expect(EXIF.getTag(img, 'Orientation')).toBe(1);
 	});
 
-	test('handles an odd name header length byte by padding it', async () => {
-		// The library reads the byte at +7 as the header length: 1 is padded to 2, so the
-		// 16-bit section length follows at +8 and data at +10
-		const record = iptcRecord(0x78, 'Odd');
-		const img = withIptc(segment(0xED, ascii('8BIM').concat([0x04, 0x04, 0x00, 0x01, 0x00, record.length], record)));
+	test.each([
+		['an empty name', ''],
+		['a one-character name', 'A'],
+		['an even-length name', 'AB'],
+		['a longer odd-length name', 'IPTC data'],
+	])('reads the IPTC resource with %s', async (label, name) => {
+		const img = withIptc(iptcSegment([iptcRecord(0x78, 'Named'), iptcRecord(0x19, 'kw')], name));
 		await getData(img);
-		expect(img.iptcdata).toEqual({ caption: 'Odd' });
+		expect(img.iptcdata).toEqual({ caption: 'Named', keywords: 'kw' });
 	});
 
 	test('returns an empty object when there is no IPTC resource', async () => {
@@ -697,12 +761,30 @@ describe('IPTC', () => {
 		expect(EXIF.getIptcTag(img, 'caption')).toBeUndefined();
 	});
 
-	test('scans byte-by-byte, so record headers inside a value are parsed as fields', async () => {
-		// Documents a bug: readIPTCData never skips over a field's data
-		const img = withIptc(iptcSegment([iptcRecord(0x78, [0x41].concat(iptcRecord(0x69, 'hi')))]));
+	test('skips over the data of a mapped dataset, so marker bytes inside a value are not parsed', async () => {
+		const inner = iptcRecord(0x69, 'hi');
+		const img = withIptc(iptcSegment([iptcRecord(0x78, [0x41].concat(inner)), iptcRecord(0x74, 'Mine')]));
 		await getData(img);
-		expect(img.iptcdata.headline).toBe('hi');
-		expect(img.iptcdata.caption).toHaveLength(8);
+		expect(img.iptcdata).toEqual({ caption: String.fromCharCode(0x41, ...inner), copyright: 'Mine' });
+	});
+
+	test('skips over the data of an unmapped dataset as well', async () => {
+		const img = withIptc(iptcSegment([iptcRecord(0x00, iptcRecord(0x69, 'hi')), iptcRecord(0x78, 'Real')]));
+		await getData(img);
+		expect(img.iptcdata).toEqual({ caption: 'Real' });
+	});
+
+	test('skips bytes between datasets one at a time', async () => {
+		const img = withIptc(iptcSegment([[0x00, 0x1C, 0x01], iptcRecord(0x78, 'After padding')]));
+		await getData(img);
+		expect(img.iptcdata).toEqual({ caption: 'After padding' });
+	});
+
+	test('steps over a dataset header with a negative (extended) size instead of looping forever', async () => {
+		// a size with the high bit set is an IPTC "extended dataset"; its value is read as empty
+		const img = withIptc(iptcSegment([[0x1C, 0x02, 0x78, 0x80, 0x04], iptcRecord(0x69, 'Next')]));
+		await getData(img);
+		expect(img.iptcdata).toEqual({ caption: '', headline: 'Next' });
 	});
 });
 
@@ -768,21 +850,57 @@ describe('XMP', () => {
 		expect(typeof img.xmpdata.parsererror['#text']).toBe('string');
 	});
 
-	test('picks up the first "http" anywhere in the file, even inside EXIF', async () => {
-		// Documents a bug: an EXIF string containing "http" is mistaken for the XMP segment
+	test('ignores "http" strings in EXIF and other segments and finds the XMP APP1 segment', async () => {
 		EXIF.enableXmp();
 		const tiff = buildTiff({ ifd0: [{ tag: 0x8298, type: 2, values: 'http://example.com/license' }] });
-		const img = { src: toDataURI(jpeg(exifSegment(tiff), xmpSegment(XMP))) };
+		const comment = segment(0xFE, ascii('see http://example.com/'));
+		const otherApp1 = segment(0xE1, ascii('http://example.com/not-xmp/\0<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Wrong"/>'));
+		const img = { src: toDataURI(jpeg(exifSegment(tiff), comment, otherApp1, xmpSegment(XMP))) };
 		await getData(img);
 		expect(img.exifdata.Copyright).toBe('http://example.com/license');
-		expect(img.xmpdata['x:xmpmeta']).toBeUndefined();
-		expect(img.xmpdata.parsererror).toBeDefined();
+		expect(img.xmpdata.parsererror).toBeUndefined();
+		expect(img.xmpdata['x:xmptk']).toBe('Test XMP');
+		expect(img.xmpdata['x:xmpmeta']['rdf:RDF']['rdf:Description']['@attributes']['tiff:Make']).toBe('Canon');
+	});
+
+	test('finds XMP after an APP1 segment too short to hold the XMP header', async () => {
+		EXIF.enableXmp();
+		const img = { src: toDataURI(jpeg(exifSegment(buildTiff()), xmpSegment(XMP))) };
+		await getData(img);
+		expect(img.xmpdata['x:xmptk']).toBe('Test XMP');
+	});
+
+	test('does not read past the end of the file for a short APP1 segment at the end', async () => {
+		EXIF.enableXmp();
+		const img = { src: toDataURI([0xFF, 0xD8].concat(app0(), exif(), segment(0xE1, ascii('http')))) };
+		await getData(img);
+		expect(img.exifdata.Orientation).toBe(8);
+		expect(img.xmpdata).toEqual({});
 	});
 
 	test('returns an empty object when there is no XMP segment', async () => {
 		EXIF.enableXmp();
 		const img = { src: toDataURI(jpeg(app0(), exif())) };
 		await getData(img);
+		expect(img.xmpdata).toEqual({});
+	});
+
+	test('returns an empty object when only EXIF strings mention http', async () => {
+		EXIF.enableXmp();
+		const tiff = buildTiff({ ifd0: [{ tag: 0x8298, type: 2, values: 'http://example.com/license' }] });
+		const img = { src: toDataURI(jpeg(app0(), exifSegment(tiff))) };
+		await getData(img);
+		expect(img.exifdata.Copyright).toBe('http://example.com/license');
+		expect(img.xmpdata).toEqual({});
+	});
+
+	test('stops at entropy-coded data and ignores XMP-like bytes after it', async () => {
+		EXIF.enableXmp();
+		const sos = segment(0xDA, [1, 1, 0, 0, 0x3F, 0]);
+		const scan = [0x00, 0x12].concat(xmpSegment(XMP));
+		const img = { src: toDataURI(jpeg(app0(), exif(), sos, scan)) };
+		await getData(img);
+		expect(img.exifdata.Orientation).toBe(8);
 		expect(img.xmpdata).toEqual({});
 	});
 
