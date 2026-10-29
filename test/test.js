@@ -45,7 +45,7 @@ describe('removebg zip2png integration tests', () => {
 		try {
 			await createRemovebgZip(zipPath, 4, 2);
 
-			const result = await cli(`zip2png --file='${zipPath}'`);
+			const result = await cli(`zip2png --file="${zipPath}"`);
 			expect(result.code).toBe(0);
 			expect(fs.existsSync(outputPath)).toBe(true);
 
