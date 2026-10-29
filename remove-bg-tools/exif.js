@@ -922,6 +922,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
                 return; // not a valid marker (e.g. entropy-coded data), there is no XMP
             }
 
+            if (dataView.getUint8(offset + 1) == 0xFF) {
+                offset++;
+                continue;
+            }
             segmentLength = dataView.getUint16(offset + 2);
             if (dataView.getUint8(offset + 1) == 225 &&
                 segmentLength - 2 >= xmpHeader.length &&
