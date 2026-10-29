@@ -157,7 +157,8 @@ removebg zip2png --file /path/to/file.zip
 
 Prerequisites:
 
-- `nodejs 14.18.1`
+- `nodejs 24.22.1` (see `.tool-versions`)
+- Only if no [node-canvas](https://github.com/Automattic/node-canvas#compiling) prebuilt binary exists for your platform: its native build libraries, e.g. on macOS `brew install pkg-config cairo pango jpeg giflib librsvg`
 
 Getting started:
 
@@ -169,6 +170,12 @@ npm run build
 npm run test
 ```
 
+To run the tests with a coverage report (written to `coverage/`, HTML report at `coverage/index.html`):
+
+```
+npm run test:coverage
+```
+
 To build & try out locally:
 
 ```
@@ -178,5 +185,4 @@ npm run build
 
 ### Creating a binary executable
 
-- npm i -g pkg
-- npm run build
+- npm run build (uses [@yao-pkg/pkg](https://github.com/yao-pkg/pkg) from the dev dependencies)

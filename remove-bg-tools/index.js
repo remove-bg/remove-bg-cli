@@ -6,6 +6,9 @@ const { parsePngFormat } = require('png-dpi-reader-writer');
 const fs = require('fs');
 const { Image, createCanvas } = require('canvas');
 
+// default for the optional progress callbacks
+function noop() {}
+
 class ImageResizer {
   constructor(file) {
     this.file = file;
@@ -58,9 +61,7 @@ class ImageResizer {
           file.resolutionInfo.verticalResolution = file.exifdata.YResolution.numerator / file.exifdata.YResolution.denominator;
         }
         resolve();
-      }
-
-      if (file.type == "image/png") {
+      } else if (file.type == "image/png") {
         var fileReader = new FileReader();
 
         fileReader.onload = function (e) {
@@ -76,13 +77,16 @@ class ImageResizer {
           resolve();
         };
         fileReader.readAsArrayBuffer(file);
+      } else {
+        // no resolution info for other types; the image is still loaded and converted
+        resolve();
       }
     });
   }
 
   loadImage() {
     return new Promise((resolve, reject) => {
-      if (this.url) unloadImage();
+      if (this.url) this.unloadImage();
       this.url = URL.createObjectURL(this.file);
       this.image = new Image();
       this.image.crossOrigin = 'anonymous';
@@ -100,29 +104,37 @@ class ImageResizer {
   }
 
   getBlob() {
-    return new Promise((resolve, reject) => {
-      var orientation;
-      if (this.file.exifdata) {
-        orientation = this.file.exifdata.Orientation;
-      }
+    // read the image synchronously: reduce() unloads it as soon as getBlob() returns
+    var image = this.image;
+    var file = this.file;
+    var orientation;
+    if (file.exifdata) {
+      orientation = file.exifdata.Orientation;
+    }
 
-      // force orientation to 1 if the exif orientation value is out of bounds or unset
-      if (!orientation || orientation < 1 || orientation > 8) orientation = 1;
+    // force orientation to 1 if the exif orientation value is out of bounds or unset
+    if (!orientation || orientation < 1 || orientation > 8) orientation = 1;
 
-      var width = this.image.width;
-      var height = this.image.height;
-      var pixels = width * height;
+    var width = image.width;
+    var height = image.height;
+    var pixels = width * height;
 
-      var maxPixels = 25000000;
-      if (pixels > maxPixels) {
-        var scale = Math.sqrt(maxPixels) / Math.sqrt(pixels);
-        width = Math.round(scale * width);
-        height = Math.round(scale * height);
-      }
+    var maxPixels = 25000000;
+    if (pixels > maxPixels) {
+      var scale = Math.sqrt(maxPixels) / Math.sqrt(pixels);
+      width = Math.round(scale * width);
+      height = Math.round(scale * height);
+    }
 
+    // rotate manually only if the image decoder does not apply the EXIF orientation itself
+    var manualRotation = file.type == "image/jpeg"
+      ? BrowserCompatibility.decoderAppliesExifOrientation().then(applied => !applied)
+      : Promise.resolve(false);
+
+    return manualRotation.then(rotate => new Promise((resolve, reject) => {
       var canvas;
-      if (this.file.type == "image/jpeg" && !BrowserCompatibility.supportsNativeExif(navigator.userAgent)) {
-        canvas = CanvasExifOrientation.drawImage(this.image, orientation, 0, 0, width, height);
+      if (rotate) {
+        canvas = CanvasExifOrientation.drawImage(image, orientation, 0, 0, width, height);
       } else {
         canvas = document.createElement('canvas');
         canvas.width = width;
@@ -130,14 +142,14 @@ class ImageResizer {
         var ctx = canvas.getContext("2d");
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(this.image, 0, 0, width, height);
+        ctx.drawImage(image, 0, 0, width, height);
       }
-      let resolutionInfo = this.file.resolutionInfo;
+      let resolutionInfo = file.resolutionInfo;
       canvas.toBlob(function (blob) {
         var returnObj = { blob: blob, resolutionInfo: resolutionInfo };
         resolve(returnObj);
       }, "image/jpeg", 0.92);
-    });
+    }));
   }
 }
 
@@ -266,7 +278,7 @@ class ZipCanvas {
     });
   }
 
-  static fromBinary(data, origData, opts = {}, progress = this.noop) {
+  static fromBinary(data, origData, opts = {}, progress = noop) {
     progress({ stage: 'loadzip', percent: 20 });
     return JSZip.loadAsync(data)
       .then(zip => {
@@ -428,10 +440,12 @@ class ZipCanvas {
               resized_canvas.height
             );
 
+            // keep the data URL: Image#src does not reliably return it (node-canvas gives '')
+            var resized_data_url = resized_canvas.toDataURL();
             image = new Image();
             image.onload = function () {
               image_entry.file = ZipCanvas.dataURLtoFile(
-                image.src,
+                resized_data_url,
                 image_entry.file.name
               );
               image_entry.width = image.width;
@@ -439,7 +453,7 @@ class ZipCanvas {
 
               resolve(image_entry);
             };
-            image.src = resized_canvas.toDataURL();
+            image.src = resized_data_url;
           };
           image.src = reader.result;
         },
@@ -486,19 +500,46 @@ class ZipCanvas {
   }
 }
 
+// 2x1 px JPEG with EXIF Orientation 6 (rotate 90deg clockwise): a decoder that applies the
+// EXIF orientation produces a 1x2 px image
+const EXIF_ORIENTATION_PROBE = 'data:image/jpeg;base64,/9j/4QAiRXhpZgAASUkqAAgAAAABABIBAwABAAAABgAAAAAAAAD/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/2wBDARESEhgVGC8aGi9jQjhCY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2P/wAARCAABAAIDAREAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDz+gD/2Q==';
+var exifOrientationProbe = null;
+
 // This class should provide different browser compatibility checks
-// supportsNativeExif: Checks if browser natively respects EXIF orientation when loading an image
-// For now only for Chrome 81+ supports this but other browsers will follow
+// decoderAppliesExifOrientation: Feature-detects whether the image decoder (browser or
+// node-canvas) applies the EXIF orientation when loading an image
+// supportsNativeExif: Checks the user agent for native EXIF orientation support
+// (Chrome 81+, Firefox 77+; it does not know about Safari 13.1+, prefer the feature detection)
 // Sources: https://paul.kinlan.me/correct-image-orientation-for-images-chrome-81/
 // https://www.fxsitecompat.dev/en-CA/docs/2020/jpeg-images-are-now-rotated-by-default-according-to-exif-data/
-// Firefox and Safari will support in the "near future"
 class BrowserCompatibility {
+  // Resolves (once, the result is cached) whether decoded images come out EXIF-rotated
+  static decoderAppliesExifOrientation() {
+    if (!exifOrientationProbe) {
+      exifOrientationProbe = new Promise((resolve) => {
+        var image = new Image();
+        image.onload = function () {
+          resolve(image.width === 1 && image.height === 2);
+        };
+        // If the probe cannot be loaded (e.g. a CSP that forbids data: images), assume a
+        // current decoder: all current browsers and node-canvas 3 apply the EXIF orientation
+        image.onerror = function () {
+          resolve(true);
+        };
+        image.src = EXIF_ORIENTATION_PROBE;
+      });
+    }
+    return exifOrientationProbe;
+  }
+
   static supportsNativeExif(userAgent) {
-    var nVer = navigator.appVersion;
-    var nAgt = navigator.userAgent;
-    var browserName = navigator.appName;
-    var fullVersion = '' + parseFloat(navigator.appVersion);
-    var majorVersion = parseInt(navigator.appVersion, 10);
+    // the global navigator is optional (e.g. Node < 21), and only used for missing info
+    var nav = typeof navigator !== 'undefined' ? navigator : {};
+    var nAgt = userAgent || nav.userAgent;
+    if (!nAgt) return false;
+    var browserName = nav.appName;
+    var fullVersion = '' + parseFloat(nav.appVersion);
+    var majorVersion;
     var nameOffset, verOffset, ix;
 
     // In Opera, the true version is after "Opera" or after "Version"
@@ -514,9 +555,14 @@ class BrowserCompatibility {
       fullVersion = nAgt.substring(verOffset + 5);
     }
     // In Chrome, the true version is after "Chrome"
-    else if ((verOffset = nAgt.indexOf("Chrome")) != -1 || (verOffset = nAgt.indexOf("Chromium")) != -1) {
+    else if ((verOffset = nAgt.indexOf("Chrome")) != -1) {
       browserName = "Chrome";
       fullVersion = nAgt.substring(verOffset + 7);
+    }
+    // In Chromium, the true version is after "Chromium"
+    else if ((verOffset = nAgt.indexOf("Chromium")) != -1) {
+      browserName = "Chrome";
+      fullVersion = nAgt.substring(verOffset + 9);
     }
     // In Safari, the true version is after "Safari" or after "Version"
     else if ((verOffset = nAgt.indexOf("Safari")) != -1) {
@@ -536,7 +582,7 @@ class BrowserCompatibility {
       browserName = nAgt.substring(nameOffset, verOffset);
       fullVersion = nAgt.substring(verOffset + 1);
       if (browserName.toLowerCase() == browserName.toUpperCase()) {
-        browserName = navigator.appName;
+        browserName = nav.appName;
       }
     }
     // trim the fullVersion string at semicolon/space if present
@@ -547,8 +593,8 @@ class BrowserCompatibility {
 
     majorVersion = parseInt('' + fullVersion, 10);
     if (isNaN(majorVersion)) {
-      fullVersion = '' + parseFloat(navigator.appVersion);
-      majorVersion = parseInt(navigator.appVersion, 10);
+      fullVersion = '' + parseFloat(nav.appVersion);
+      majorVersion = parseInt(nav.appVersion, 10);
     }
 
     if (browserName == "Chrome") {

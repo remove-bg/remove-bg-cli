@@ -1,27 +1,13 @@
 const fs = require('fs');
-const execa = require('execa');
+const os = require('os');
 let path = require('path');
 let exec = require('child_process').exec;
 
-const commandLineArgs = require('command-line-args')
-
-const { validateRemovebgOptions, optionDefinitions, mainDefinitions, injectEnvVars } = require('../lib/options')
-const { expandPaths } = require('../lib/storage');
-const { JPEGStream } = require('canvas');
-require('dotenv').config()
-
-function optionsFromArgv(args) {
-	const mainOptions = commandLineArgs(mainDefinitions, { stopAtFirstUnknown: true, argv: args })
-	const argv = mainOptions._unknown || []
-
-	const removebgOptions = commandLineArgs(optionDefinitions, { argv })
-	injectEnvVars(removebgOptions);
-	return removebgOptions;
-}
+const { createCanvas, loadImage } = require('canvas');
+const { createRemovebgZip } = require('./helpers/fixtures');
 
 function cli(args, cwd) {
 	return new Promise(resolve => {
-		console.log(path.resolve('./cli'));
 		exec(`node ${path.resolve('./cli')} ${args}`,
 			{ cwd },
 			(error, stdout, stderr) => {
@@ -53,14 +39,25 @@ describe('removebg zip2png integration tests', () => {
 	});
 
 	test('run removebg zip2png with cli (/test.zip)', async () => {
-
-		let result = await cli("zip2png --file='" + process.env.TEST_DATA_DIR + "/test.zip'")
+		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'removebg-test-'));
+		const zipPath = path.join(tmpDir, 'test.zip');
+		const outputPath = path.join(tmpDir, 'test.png');
 		try {
-			var outputPath = 'test/files/test.png';
+			await createRemovebgZip(zipPath, 4, 2);
+
+			const result = await cli(`zip2png --file="${zipPath}"`);
+			expect(result.code).toBe(0);
 			expect(fs.existsSync(outputPath)).toBe(true);
-			fs.unlinkSync(outputPath);
-		} catch (e) {
-			console.log(e);
+
+			const image = await loadImage(outputPath);
+			expect([image.width, image.height]).toEqual([4, 2]);
+
+			const ctx = createCanvas(image.width, image.height).getContext('2d');
+			ctx.drawImage(image, 0, 0);
+			expect(ctx.getImageData(0, 0, 1, 1).data[3]).toBe(255); // opaque half
+			expect(ctx.getImageData(3, 0, 1, 1).data[3]).toBe(0); // transparent half
+		} finally {
+			fs.rmSync(tmpDir, { recursive: true, force: true });
 		}
 	});
 

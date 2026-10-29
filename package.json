@@ -5,40 +5,43 @@
 	"author": "Kaleido AI GmbH",
 	"email": "hello@kaleido.ai",
 	"private": true,
-	"version": "2.0.3",
+	"version": "3.0.0",
 	"engines": {
-		"node": "16.20.2"
+		"node": "24.22.1"
 	},
 	"bin": "cli.js",
 	"scripts": {
-		"test": "jest test/test.js",
+		"test": "node --experimental-vm-modules --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js",
+		"test:coverage": "node --experimental-vm-modules --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js --coverage",
 		"build": "pkg package.json -o dist/removebg -t host"
 	},
 	"dependencies": {
-		"ag-psd": "^14.3.2",
-		"better-queue": "^3.8.10",
-		"canvas": "^2.11.2",
+		"ag-psd": "^33.0.0",
+		"better-queue": "^3.8.12",
+		"canvas": "^3.2.3",
 		"canvas-exif-orientation": "^0.4.0",
-		"cli-progress": "^3.9.1",
-		"command-line-args": "^5.2.0",
-		"command-line-usage": "^6.1.1",
-		"dotenv": "^16.4.7",
-		"filereader": "^0.10.3",
-		"glob": "^7.2.0",
-		"jszip": "^3.7.1",
+		"cli-progress": "^3.12.0",
+		"command-line-args": "^6.0.2",
+		"command-line-usage": "^7.0.4",
+		"glob": "^13.0.6",
+		"jszip": "^3.10.2",
 		"png-dpi-reader-writer": "^0.2.4",
 		"prompts": "^2.4.2",
-		"superagent": "^6.1.0"
+		"superagent": "^10.4.1"
 	},
 	"devDependencies": {
-		"execa": "^5.0.0",
-		"jest": "^27.4.2",
-		"pkg": "^5.8.1"
+		"@yao-pkg/pkg": "^6.24.0",
+		"jest": "^30.5.2",
+		"jest-environment-jsdom": "^30.5.2",
+		"nock": "^15.0.5"
 	},
 	"pkg": {
 		"scripts": "cli.js",
 		"assets": [
 			"node_modules/canvas/build/Release/**"
 		]
+	},
+	"allowScripts": {
+		"canvas": true
 	}
 }

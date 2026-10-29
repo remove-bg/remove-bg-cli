@@ -12,8 +12,8 @@ executors:
     resource_class: medium
   macos:
     macos:
-      xcode: 15.4.0
-    resource_class: macos.m1.medium.gen1
+      xcode: 27.2.0
+    resource_class: m4pro.medium
 
 
 filters: &filters
@@ -51,7 +51,7 @@ jobs:
                   pyenv rehash
       - checkout
       - node/install:
-          node-version: 16.20.2
+          node-version: 24.22.1
       - run:
           name: Verify Versions
           command: |
@@ -61,7 +61,7 @@ jobs:
           name: Install
           command: |
             npm i
-            npm i --prefix=$HOME/.local -g pkg
+            npm i --prefix=$HOME/.local -g @yao-pkg/pkg
             ls -la $HOME/.local
             ls -la $HOME/.local/bin
             echo 'export PATH=$HOME/.local/bin:$PATH' >> $BASH_ENV
@@ -71,7 +71,8 @@ jobs:
             echo "Path: $PATH"
             echo "pkg location: $(which pkg)"
             npm run build
-            tar -czvf dist/removebg_cli_VERSION_<< parameters.os >>.tar.gz dist/removebg
+            VERSION=$(node -p "require('./package.json').version")
+            tar -czvf dist/removebg_cli_${VERSION}_<< parameters.os >>.tar.gz dist/removebg
       - store_artifacts:
           path: dist
       - persist_to_workspace:
@@ -87,8 +88,8 @@ jobs:
       - run:
           name: Install Node
           command: |
-            nvm install 16.20.2
-            nvm use 16.20.2
+            nvm install 24.22.1
+            nvm use 24.22.1
       - run:
           name: Verify Versions
           command: |
@@ -99,12 +100,13 @@ jobs:
           command: |
             npm install
             dir
-            npm i -g pkg
+            npm i -g @yao-pkg/pkg
       - run:
           name: Build
           command: |
             npm run build
-            Compress-Archive -LiteralPath dist\removebg.exe -DestinationPath dist\removebg_cli_VERSION_windows.zip
+            $version = node -p "require('./package.json').version"
+            Compress-Archive -LiteralPath dist\removebg.exe -DestinationPath "dist\removebg_cli_${version}_windows.zip"
       - store_artifacts:
           path: dist
       - persist_to_workspace:
